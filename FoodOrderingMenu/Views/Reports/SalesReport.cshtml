@@ -1,0 +1,280 @@
+﻿@{
+    ViewData["Title"] = "Sales Report";
+    Layout = "_Layout";
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold">Sales Report</h2>
+
+        <!-- Period Selector -->
+        <div class="btn-group">
+            <a asp-action="SalesReport" asp-route-period="today"
+               class="btn btn-sm @(ViewBag.Period == "today" ? "btn-primary" : "btn-outline-primary")">
+                Today
+            </a>
+            <a asp-action="SalesReport" asp-route-period="week"
+               class="btn btn-sm @(ViewBag.Period == "week" ? "btn-primary" : "btn-outline-primary")">
+                Last 7 Days
+            </a>
+            <a asp-action="SalesReport" asp-route-period="month"
+               class="btn btn-sm @(ViewBag.Period == "month" ? "btn-primary" : "btn-outline-primary")">
+                Last 30 Days
+            </a>
+            <a asp-action="SalesReport" asp-route-period="year"
+               class="btn btn-sm @(ViewBag.Period == "year" ? "btn-primary" : "btn-outline-primary")">
+                Last Year
+            </a>
+        </div>
+    </div>
+
+    <div class="alert alert-info">
+        <i class="bi bi-calendar3"></i>
+        <strong>Period:</strong> @ViewBag.StartDate - @ViewBag.EndDate
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm text-center p-3 border-start border-5 border-success">
+                <h6 class="text-muted mb-2">Total Revenue</h6>
+                <h2 class="text-success fw-bold mb-0">RM @ViewBag.TotalRevenue.ToString("F2")</h2>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm text-center p-3 border-start border-5 border-primary">
+                <h6 class="text-muted mb-2">Total Orders</h6>
+                <h2 class="text-primary fw-bold mb-0">@ViewBag.TotalOrders</h2>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm text-center p-3 border-start border-5 border-info">
+                <h6 class="text-muted mb-2">Average Order Value</h6>
+                <h2 class="text-info fw-bold mb-0">RM @ViewBag.AvgOrderValue.ToString("F2")</h2>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm text-center p-3 border-start border-5 border-dark">
+                <h6 class="text-muted mb-2">Completed Orders</h6>
+                <h2 class="text-dark fw-bold mb-0">@ViewBag.CompletedOrders</h2>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row g-4 mb-4">
+        <!-- Daily Sales Chart -->
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> Daily Sales Trend</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="dailySalesChart" style="height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Methods Breakdown -->
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Payment Methods</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="paymentChart" style="height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Selling Items -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0"><i class="bi bi-trophy"></i> Top 10 Selling Items</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 60px;" class="text-center">Rank</th>
+                            <th>Item Name</th>
+                            <th style="width: 150px;" class="text-center">Quantity Sold</th>
+                            <th style="width: 150px;" class="text-end">Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{
+                            int rank = 1;
+                        }
+                        @foreach (var item in ViewBag.TopItems as IEnumerable<dynamic>)
+                        {
+                            <tr>
+                                <td class="text-center">
+                                    @if (rank == 1)
+                                    {
+                                        <span class="badge bg-warning">🥇 @rank</span>
+                                    }
+                                    else if (rank == 2)
+                                    {
+                                        <span class="badge bg-secondary">🥈 @rank</span>
+                                    }
+                                    else if (rank == 3)
+                                    {
+                                        <span class="badge bg-danger">🥉 @rank</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-light text-dark">@rank</span>
+                                    }
+                                </td>
+                                <td class="fw-bold">@item.ItemName</td>
+                                <td class="text-center">
+                                    <span class="badge bg-primary">@item.TotalQuantity units</span>
+                                </td>
+                                <td class="text-end fw-bold text-success">RM @item.TotalRevenue.ToString("F2")</td>
+                            </tr>
+                            rank++;
+                        }
+
+                        @if (!(ViewBag.TopItems as IEnumerable<dynamic>).Any())
+                        {
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted">
+                                    No sales data available for this period
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Prepare data for charts
+        const dailySalesData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.DailySales));
+        const paymentData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.PaymentBreakdown));
+
+        // Daily Sales Chart
+        const dailyLabels = dailySalesData.map(d => {
+            const date = new Date(d.date);
+            return date.toLocaleDateString('en-MY', { month: 'short', day: 'numeric' });
+        });
+        const dailyRevenue = dailySalesData.map(d => d.revenue);
+        const dailyOrders = dailySalesData.map(d => d.orderCount);
+
+        const ctxDaily = document.getElementById('dailySalesChart').getContext('2d');
+        new Chart(ctxDaily, {
+            type: 'line',
+            data: {
+                labels: dailyLabels,
+                datasets: [
+                    {
+                        label: 'Revenue (RM)',
+                        data: dailyRevenue,
+                        borderColor: '#198754',
+                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Orders',
+                        data: dailyOrders,
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Revenue (RM)'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Number of Orders'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                }
+            }
+        });
+
+        // Payment Methods Chart
+        const paymentLabels = paymentData.map(p => p.method);
+        const paymentCounts = paymentData.map(p => p.count);
+        const paymentColors = [
+            '#0d6efd', '#198754', '#ffc107', '#dc3545', '#6c757d'
+        ];
+
+        const ctxPayment = document.getElementById('paymentChart').getContext('2d');
+        new Chart(ctxPayment, {
+            type: 'doughnut',
+            data: {
+                labels: paymentLabels,
+                datasets: [{
+                    data: paymentCounts,
+                    backgroundColor: paymentColors,
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value} orders (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+}

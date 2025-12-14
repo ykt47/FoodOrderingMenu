@@ -1,0 +1,94 @@
+﻿@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Login";
+}
+
+<div class="container col-md-5 mt-4">
+
+    <h2 class="fw-bold mb-3">Login</h2>
+
+    @if (ViewBag.Error != null)
+    {
+        <div class="alert alert-danger">@ViewBag.Error</div>
+    }
+
+    <!-- LOGIN FORM -->
+    <form method="post" asp-action="Login" novalidate>
+        @Html.AntiForgeryToken()
+
+        <div class="mb-3">
+            <label>Email</label>
+            <input id="emailInput" name="email" class="form-control" type="email" />
+            <small id="emailError" class="text-danger d-none">Please enter your email.</small>
+        </div>
+
+        <div class="mb-3">
+            <label>Password</label>
+
+            <div class="input-group">
+                <input id="passwordInput" name="password" type="password" class="form-control" />
+                <button type="button" class="btn btn-outline-secondary" id="togglePassword">
+                    <span id="eyeIcon">Show</span>
+                </button>
+            </div>
+
+            <small id="passwordError" class="text-danger d-none">Please enter your password.</small>
+        </div>
+
+        <div class="d-flex justify-content-between mt-2">
+            <a asp-action="ForgotPassword" class="text-primary">Forgot Password?</a>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100 mt-3" id="loginBtn">Login</button>
+    </form>
+
+    <!-- GUEST BUTTON (NOT inside the login form) -->
+    <a asp-controller="Account" asp-action="Guest"
+       class="btn btn-dark w-100 mt-2">
+        Continue as Guest
+    </a>
+
+</div>
+
+@section Scripts {
+    <script>
+        // Show/Hide password
+        const togglePassword = document.getElementById("togglePassword");
+        const passwordInput = document.getElementById("passwordInput");
+        const eyeIcon = document.getElementById("eyeIcon");
+
+        togglePassword.addEventListener("click", function () {
+            if (passwordInput.type === "password") {
+                passwordInput.type = "text";
+                eyeIcon.innerText = "Hide";
+            } else {
+                passwordInput.type = "password";
+                eyeIcon.innerText = "Show";
+            }
+        });
+
+        // Simple red validation message (instead of browser popup)
+        document.getElementById("loginBtn").addEventListener("click", function (e) {
+            const email = document.getElementById("emailInput").value.trim();
+            const pw = passwordInput.value.trim();
+
+            let ok = true;
+
+            if (!email) {
+                document.getElementById("emailError").classList.remove("d-none");
+                ok = false;
+            } else {
+                document.getElementById("emailError").classList.add("d-none");
+            }
+
+            if (!pw) {
+                document.getElementById("passwordError").classList.remove("d-none");
+                ok = false;
+            } else {
+                document.getElementById("passwordError").classList.add("d-none");
+            }
+
+            if (!ok) e.preventDefault();
+        });
+    </script>
+}

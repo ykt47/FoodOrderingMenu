@@ -1,0 +1,240 @@
+﻿@using System.Security.Claims
+@using FoodOrderingMenu.Helpers
+@using FoodOrderingMenu.Models
+
+@{
+    var role = User.FindFirst(ClaimTypes.Role)?.Value;
+    var isAdmin = role == "Admin";
+    var isLoggedIn = User.Identity?.IsAuthenticated ?? false;
+
+    // CART COUNT (works for guest + customer)
+    var cart = Context.Session.GetObject<List<CartItem>>("CART") ?? new List<CartItem>();
+    var cartCount = cart.Sum(x => x.Qty);
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"] - Food Menu</title>
+    <meta name="viewport" content="width=device-width" />
+
+    <!-- Bootswatch Cosmo Theme -->
+    <link href="https://cdn.jsdelivr.net/npm/bootswatch@5.2.3/dist/cosmo/bootstrap.min.css" rel="stylesheet" />
+
+    <!-- Bootstrap Icons (needed for bi-xxx icons) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+    <link rel="stylesheet" href="~/css/site.css" />
+</head>
+
+<body class="d-flex flex-column min-vh-100">
+
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+
+            <a class="navbar-brand"
+               asp-controller="@(isAdmin ? "Admin" : "Home")"
+               asp-action="Index">
+                Food Menu
+            </a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="nav">
+
+                <!-- LEFT NAV -->
+                <ul class="navbar-nav me-auto">
+
+                    @* ---------------- CUSTOMER / GUEST NAV ---------------- *@
+                    @if (!isAdmin)
+                    {
+                        <li class="nav-item">
+                            <a class="nav-link" asp-controller="Home" asp-action="Index">Home</a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link" asp-controller="Menu" asp-action="Index">Menu</a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link position-relative" asp-controller="Cart" asp-action="Index">
+                                <i class="bi bi-cart3"></i> Cart
+
+                                @if (cartCount > 0)
+                                {
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                        @cartCount
+                                    </span>
+                                }
+                            </a>
+                        </li>
+
+                        @* 🆕 NEW: My Orders for logged-in customers *@
+                        @if (isLoggedIn)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Reports" asp-action="MyOrders">
+                                    <i class="bi bi-clock-history"></i> My Orders
+                                </a>
+                            </li>
+                        }
+                    }
+
+                    @* ---------------- ADMIN NAV ---------------- *@
+                    @if (isAdmin)
+                    {
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle fw-bold text-warning" href="#" role="button" data-bs-toggle="dropdown">
+                                Menu
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" asp-controller="MenuItem" asp-action="Index">Items</a></li>
+                                <li><a class="dropdown-item" asp-controller="MenuCategory" asp-action="Index">Categories</a></li>
+                            </ul>
+                        </li>
+
+                        @* 🆕 UPDATED: Orders dropdown with real links *@
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                Orders
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item" asp-controller="OrderManagement" asp-action="Index">
+                                        <i class="bi bi-list-check"></i> Manage Orders
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li>
+                                    <a class="dropdown-item" asp-controller="Reports" asp-action="OrderHistory">
+                                        <i class="bi bi-archive"></i> Order History
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        @* 🆕 UPDATED: Reports dropdown with real links *@
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                Reports
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item" asp-controller="Reports" asp-action="SalesReport">
+                                        <i class="bi bi-graph-up"></i> Sales Report
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" asp-controller="Admin" asp-action="Index">
+                                        <i class="bi bi-speedometer2"></i> Dashboard
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li>
+                                    <a class="dropdown-item disabled">
+                                        <i class="bi bi-bell"></i> Notifications (Coming Soon)
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                    }
+
+                </ul>
+
+                <!-- RIGHT NAV -->
+                <ul class="navbar-nav">
+
+                    @if (isLoggedIn)
+                    {
+                        <li class="nav-item dropdown">
+
+                            <a class="nav-link dropdown-toggle d-flex align-items-center"
+                               href="#" role="button" data-bs-toggle="dropdown">
+
+                                <img src="https://cdn-icons-png.flaticon.com/512/847/847969.png"
+                                     style="width:28px; height:28px; border-radius:50%; margin-right:6px;" />
+                            </a>
+
+                            <ul class="dropdown-menu dropdown-menu-end">
+
+                                <li class="dropdown-header fw-bold">
+                                    @User.Identity?.Name
+                                </li>
+
+                                <li>
+                                    <div class="dropdown-item-text">
+                                        <strong>Email:</strong> @User.FindFirst(ClaimTypes.Email)?.Value
+                                    </div>
+                                </li>
+
+                                <li>
+                                    <div class="dropdown-item-text">
+                                        <strong>Role:</strong> @role
+                                    </div>
+                                </li>
+
+                                <li><hr class="dropdown-divider" /></li>
+
+                                <li>
+                                    <a class="dropdown-item text-danger"
+                                       asp-controller="Account"
+                                       asp-action="Logout">
+                                        Logout
+                                    </a>
+                                </li>
+                            </ul>
+
+                        </li>
+                    }
+                    else
+                    {
+                        <li class="nav-item">
+                            <a class="nav-link" asp-controller="Account" asp-action="Login">Login</a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link" asp-controller="Account" asp-action="Register">Register</a>
+                        </li>
+                    }
+
+                </ul>
+
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-fill">
+        <div class="container mt-4">
+            @RenderBody()
+        </div>
+    </main>
+
+    <!-- FOOTER (always bottom) -->
+    <footer class="footer py-3 bg-light text-center mt-auto">
+        Food Menu Ordering System — Demo Project
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- LOGIN SUCCESS TOAST -->
+    @if (TempData["LoginSuccess"] != null)
+    {
+        <div class="toast-container position-fixed bottom-0 end-0 p-3">
+            <div class="toast show text-bg-success border-0">
+                <div class="toast-body">
+                    @TempData["LoginSuccess"]
+                </div>
+            </div>
+        </div>
+    }
+
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,268 @@
+﻿@model IEnumerable<FoodOrderingMenu.Models.MenuItem>
+@{
+    ViewData["Title"] = "Menu";
+}
+
+<div class="menu-header text-center">
+    <h1 class="fw-bold">Our Menu</h1>
+    <p class="text-muted">Freshly prepared meals, made with love.</p>
+</div>
+
+<!-- SEARCH BAR -->
+<div class="d-flex justify-content-center mb-4">
+    <input id="searchBox" type="text" class="form-control search-box"
+           placeholder="Search for food, drinks, categories...">
+</div>
+
+<!-- CATEGORY FILTER BAR -->
+<div class="category-scroll">
+    <button class="cat-btn active" data-category="all">
+        <i class="bi-grid"></i> All
+    </button>
+
+    @foreach (var cat in Model.Select(m => m.Category).Distinct())
+    {
+        if (cat != null)
+        {
+            <button class="cat-btn" data-category="@cat.Name">
+                <i class="bi @cat.Icon"></i> @cat.Name
+            </button>
+        }
+    }
+</div>
+
+<!-- LOADING -->
+<div id="loading" class="loading d-none">
+    <div class="spinner-border text-primary"></div>
+</div>
+
+<!-- NO RESULTS -->
+<div id="noResults" class="alert alert-warning text-center d-none">
+    No items found. Try another search.
+</div>
+
+<!-- MENU GRID -->
+<div class="row g-4" id="menuGrid">
+    @foreach (var item in Model)
+    {
+        <div class="col-md-4 menu-item"
+             data-category="@item.Category?.Name"
+             data-name="@item.Name.ToLower()"
+             data-description="@item.Description.ToLower()">
+
+            <div class="card menu-card item-click"
+                 data-id="@item.Id"
+                 data-name="@item.Name"
+                 data-price="@item.Price"
+                 data-category="@item.Category?.Name"
+                 data-description="@item.Description"
+                 data-image="@item.ImageUrl">
+
+                <div class="img-wrapper">
+                    <img src="@item.ImageUrl" class="menu-img" alt="@item.Name">
+                </div>
+
+                <div class="card-body">
+                    <h5 class="fw-bold">@item.Name</h5>
+                    <p class="text-muted small">@item.Description</p>
+                    <span class="fw-bold text-success price">RM @item.Price</span>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- ITEM MODAL -->
+<div class="modal fade" id="itemModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content p-2">
+
+            <img id="modalImage" class="w-100 rounded" style="height:250px; object-fit:cover;">
+
+            <div class="p-3">
+
+                <h4 id="modalName" class="fw-bold"></h4>
+                <p id="modalDescription" class="text-muted"></p>
+                <h5 class="fw-bold text-success">RM <span id="modalPrice"></span></h5>
+
+                <!-- DRINK OPTIONS -->
+                <div id="drinkOptions" class="mt-3 d-none">
+                    <label class="fw-bold">Sweetness Level</label>
+                    <select id="sweetnessSelect" class="form-select mb-3">
+                        <option value="0%">0%</option>
+                        <option value="30%">30%</option>
+                        <option value="50%">50%</option>
+                        <option value="75%">75%</option>
+                        <option value="100%">100%</option>
+                    </select>
+
+                    <label class="fw-bold">Ice Level</label>
+                    <select id="iceSelect" class="form-select mb-3">
+                        <option value="No Ice">No Ice</option>
+                        <option value="Less Ice">Less Ice</option>
+                        <option value="Normal Ice">Normal Ice</option>
+                    </select>
+                </div>
+
+                <div class="qty-wrapper mt-2">
+                    <button id="qtyMinus" class="qty-btn">-</button>
+                    <span id="qtyValue">1</span>
+                    <button id="qtyPlus" class="qty-btn">+</button>
+                </div>
+
+                <a id="addToCartBtn" class="btn btn-primary w-100 mt-3">Add to Cart</a>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+
+        /* INITIAL LOADING */
+        $("#loading").removeClass("d-none");
+        setTimeout(() => $("#loading").fadeOut(), 400);
+
+        $(".item-click").on("click", function () {
+
+            let name = $(this).data("name");
+            let price = $(this).data("price");
+            let desc = $(this).data("description");
+            let image = $(this).data("image");
+            let category = $(this).data("category");
+            let id = $(this).data("id");
+
+            $("#modalName").text(name);
+            $("#modalPrice").text(price);
+            $("#modalDescription").text(desc);
+            $("#modalImage").attr("src", image);
+
+            $("#qtyValue").text(1);
+
+            // If category = Beverages → show sweetness + ice
+            if (category && category.toLowerCase() === "beverages") {
+                $("#drinkOptions").removeClass("d-none");
+            } else {
+                $("#drinkOptions").addClass("d-none");
+            }
+
+            $("#addToCartBtn").attr("href", `/Cart/Add?id=${id}&qty=1`);
+
+            new bootstrap.Modal("#itemModal").show();
+        });
+
+        /* QUANTITY BUTTONS */
+        $("#qtyPlus").click(() => updateQty(+1));
+        $("#qtyMinus").click(() => updateQty(-1));
+
+        function updateQty(change) {
+            let qty = Math.max(1, parseInt($("#qtyValue").text()) + change);
+            $("#qtyValue").text(qty);
+
+            const href = $("#addToCartBtn").attr("href").split("&")[0];
+            $("#addToCartBtn").attr("href", `${href}&qty=${qty}`);
+        }
+
+        /* CATEGORY + SEARCH FILTERING */
+        $(".cat-btn").on("click", function () {
+            $(".cat-btn").removeClass("active");
+            $(this).addClass("active");
+            filterItems();
+        });
+
+        $("#searchBox").on("keyup", filterItems);
+
+        function filterItems() {
+            const category = $(".cat-btn.active").data("category");
+            const search = $("#searchBox").val().toLowerCase();
+
+            let visible = 0;
+
+            $(".menu-item").each(function () {
+
+                const matchesCategory = category === "all" || $(this).data("category") === category;
+                const matchesSearch =
+                    $(this).data("name").includes(search) ||
+                    $(this).data("description").includes(search);
+
+                if (matchesCategory && matchesSearch) {
+                    $(this).fadeIn(200);
+                    visible++;
+                } else {
+                    $(this).fadeOut(200);
+                }
+            });
+
+            if (visible === 0)
+                $("#noResults").removeClass("d-none");
+            else
+                $("#noResults").addClass("d-none");
+        }
+
+    </script>
+}
+
+<style>
+
+    .search-box {
+        max-width: 450px;
+    }
+
+    .category-scroll {
+        display: flex;
+        gap: 10px;
+        overflow-x: auto;
+        margin-bottom: 20px;
+    }
+
+    .cat-btn {
+        padding: 8px 16px;
+        border: 1px solid #ddd;
+        border-radius: 25px;
+        background: white;
+        cursor: pointer;
+    }
+
+        .cat-btn.active {
+            background: #0d6efd;
+            color: white;
+        }
+
+    .img-wrapper {
+        width: 100%;
+        height: 200px; /* uniform height */
+        overflow: hidden;
+        border-radius: 12px 12px 0 0;
+    }
+
+    .menu-card {
+        width: 100%;
+        max-width: 300px;
+        height: 450px; /* increased so all content fits */
+        border-radius: 12px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        transition: transform .25s ease, box-shadow .25s ease;
+    }
+
+        .menu-card:hover {
+            transform: scale(1.03);
+            box-shadow: 0 8px 25px rgba(0,0,0,.2);
+        }
+
+    .menu-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover; /* ensures perfect cropping */
+        display: block;
+    }
+
+    .qty-btn {
+        padding: 6px 14px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+    }
+
+</style>

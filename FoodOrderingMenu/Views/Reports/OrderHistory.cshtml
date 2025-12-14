@@ -1,0 +1,284 @@
+﻿@model IEnumerable<FoodOrderingMenu.Models.Order>
+@{
+    ViewData["Title"] = "Order History";
+    Layout = "_Layout";
+}
+
+<div class="container-fluid py-4">
+    <h2 class="fw-bold mb-4">Order History</h2>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form asp-action="OrderHistory" method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" name="startDate" class="form-control" value="@ViewBag.StartDate" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">End Date</label>
+                    <input type="date" name="endDate" class="form-control" value="@ViewBag.EndDate" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="All" selected="@(ViewBag.Status == "All")">All Statuses</option>
+                        <option value="Received" selected="@(ViewBag.Status == "Received")">Received</option>
+                        <option value="Pending" selected="@(ViewBag.Status == "Pending")">Pending</option>
+                        <option value="Preparing" selected="@(ViewBag.Status == "Preparing")">Preparing</option>
+                        <option value="Ready" selected="@(ViewBag.Status == "Ready")">Ready</option>
+                        <option value="Completed" selected="@(ViewBag.Status == "Completed")">Completed</option>
+                        <option value="Cancelled" selected="@(ViewBag.Status == "Cancelled")">Cancelled</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="bi bi-filter"></i> Apply Filters
+                    </button>
+                    <a asp-action="OrderHistory" class="btn btn-secondary">
+                        <i class="bi bi-x-circle"></i> Clear
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    @{
+        var totalRevenue = Model.Where(o => o.Status != "Cancelled").Sum(o => o.GrandTotal);
+        var totalOrders = Model.Count();
+        var completedOrders = Model.Count(o => o.Status == "Completed");
+        var cancelledOrders = Model.Count(o => o.Status == "Cancelled");
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Total Orders</h6>
+                    <h3 class="mb-0">@totalOrders</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Total Revenue</h6>
+                    <h3 class="mb-0 text-success">RM @totalRevenue.ToString("F2")</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Completed</h6>
+                    <h3 class="mb-0 text-primary">@completedOrders</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Cancelled</h6>
+                    <h3 class="mb-0 text-danger">@cancelledOrders</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AJAX Search -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" id="searchKeyword" class="form-control" placeholder="Search by Order ID, Customer Name, or Email..." />
+                <button class="btn btn-primary" id="btnSearch">Search</button>
+            </div>
+            <small class="text-muted">Results will appear below in real-time</small>
+        </div>
+    </div>
+
+    <!-- Search Results (AJAX) -->
+    <div id="searchResults" class="d-none mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">Search Results</h5>
+            </div>
+            <div class="card-body" id="searchResultsBody">
+                <!-- AJAX content will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders Table -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Order #</th>
+                            <th>Date/Time</th>
+                            <th>Customer</th>
+                            <th>Items</th>
+                            <th>Total</th>
+                            <th>Payment</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-4 text-muted">
+                                    No orders found for the selected filters
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var order in Model)
+                            {
+                                <tr>
+                                    <td class="fw-bold">#@order.Id</td>
+                                    <td>
+                                        <small>@order.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</small><br />
+                                        <small class="text-muted">@order.CreatedAt.ToLocalTime().ToString("hh:mm tt")</small>
+                                    </td>
+                                    <td>
+                                        @if (order.User != null)
+                                        {
+                                            <div>@order.User.FullName</div>
+                                            <small class="text-muted">@order.User.Email</small>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Guest</span>
+                                        }
+                                    </td>
+                                    <td>@order.Items.Count item(s)</td>
+                                    <td class="fw-bold">RM @order.GrandTotal.ToString("F2")</td>
+                                    <td>
+                                        <span class="badge bg-secondary">@order.PaymentMethod</span>
+                                    </td>
+                                    <td>
+                                        @switch (order.Status)
+                                        {
+                                            case "Received":
+                                                <span class="badge bg-primary">@order.Status</span>
+                                                break;
+                                            case "Pending":
+                                                <span class="badge bg-warning text-dark">@order.Status</span>
+                                                break;
+                                            case "Preparing":
+                                                <span class="badge bg-info">@order.Status</span>
+                                                break;
+                                            case "Ready":
+                                                <span class="badge bg-success">@order.Status</span>
+                                                break;
+                                            case "Completed":
+                                                <span class="badge bg-dark">@order.Status</span>
+                                                break;
+                                            case "Cancelled":
+                                                <span class="badge bg-danger">@order.Status</span>
+                                                break;
+                                        }
+                                    </td>
+                                    <td>
+                                        <a asp-controller="OrderManagement" asp-action="Details" asp-route-id="@order.Id"
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // AJAX Search
+        const searchKeyword = document.getElementById('searchKeyword');
+        const btnSearch = document.getElementById('btnSearch');
+        const searchResults = document.getElementById('searchResults');
+        const searchResultsBody = document.getElementById('searchResultsBody');
+
+        async function performSearch() {
+            const keyword = searchKeyword.value.trim();
+
+            if (keyword.length < 2) {
+                searchResults.classList.add('d-none');
+                return;
+            }
+
+            try {
+                const response = await fetch(`@Url.Action("SearchOrders", "Reports")?keyword=${encodeURIComponent(keyword)}`);
+                const data = await response.json();
+
+                if (data.length === 0) {
+                    searchResultsBody.innerHTML = '<p class="text-muted text-center py-3">No results found</p>';
+                } else {
+                    let html = '<div class="table-responsive"><table class="table table-sm mb-0">';
+                    html += '<thead><tr><th>Order #</th><th>Date</th><th>Customer</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+
+                    data.forEach(order => {
+                        const statusBadge = getStatusBadge(order.status);
+                        html += `
+                            <tr>
+                                <td class="fw-bold">#${order.id}</td>
+                                <td><small>${order.orderDate}</small></td>
+                                <td>${order.customerName}<br/><small class="text-muted">${order.customerEmail}</small></td>
+                                <td class="fw-bold">RM ${order.total.toFixed(2)}</td>
+                                <td>${statusBadge}</td>
+                                <td>
+                                    <a href="/OrderManagement/Details/${order.id}" class="btn btn-sm btn-outline-primary">View</a>
+                                </td>
+                            </tr>
+                        `;
+                    });
+
+                    html += '</tbody></table></div>';
+                    searchResultsBody.innerHTML = html;
+                }
+
+                searchResults.classList.remove('d-none');
+            } catch (error) {
+                console.error('Search error:', error);
+                searchResultsBody.innerHTML = '<p class="text-danger">Error performing search</p>';
+            }
+        }
+
+        function getStatusBadge(status) {
+            const badges = {
+                'Received': '<span class="badge bg-primary">Received</span>',
+                'Pending': '<span class="badge bg-warning text-dark">Pending</span>',
+                'Preparing': '<span class="badge bg-info">Preparing</span>',
+                'Ready': '<span class="badge bg-success">Ready</span>',
+                'Completed': '<span class="badge bg-dark">Completed</span>',
+                'Cancelled': '<span class="badge bg-danger">Cancelled</span>'
+            };
+            return badges[status] || status;
+        }
+
+        btnSearch.addEventListener('click', performSearch);
+        searchKeyword.addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') performSearch();
+        });
+
+        // Real-time search (debounced)
+        let searchTimeout;
+        searchKeyword.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(performSearch, 500);
+        });
+    </script>
+}

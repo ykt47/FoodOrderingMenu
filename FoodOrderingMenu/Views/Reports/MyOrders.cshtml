@@ -1,0 +1,160 @@
+﻿@model IEnumerable<FoodOrderingMenu.Models.Order>
+@{
+    ViewData["Title"] = "My Orders";
+    Layout = "_Layout";
+}
+
+<div class="container py-4">
+    <h2 class="fw-bold mb-4">My Order History</h2>
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (!Model.Any())
+    {
+        <div class="card shadow-sm text-center p-5">
+            <i class="bi bi-cart-x display-1 text-muted mb-3"></i>
+            <h4 class="mb-2">No Orders Yet</h4>
+            <p class="text-muted mb-4">You haven't placed any orders. Start browsing our menu!</p>
+            <a asp-controller="Menu" asp-action="Index" class="btn btn-primary">
+                <i class="bi bi-shop"></i> Browse Menu
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @foreach (var order in Model)
+            {
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-0">Order #@order.Id</h5>
+                                <small class="text-muted">@order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</small>
+                            </div>
+                            <div>
+                                @switch (order.Status)
+                                {
+                                    case "Received":
+                                        <span class="badge bg-primary">@order.Status</span>
+                                        break;
+                                    case "Pending":
+                                        <span class="badge bg-warning text-dark">@order.Status</span>
+                                        break;
+                                    case "Preparing":
+                                        <span class="badge bg-info">@order.Status</span>
+                                        break;
+                                    case "Ready":
+                                        <span class="badge bg-success">@order.Status</span>
+                                        break;
+                                    case "Completed":
+                                        <span class="badge bg-dark">@order.Status</span>
+                                        break;
+                                    case "Cancelled":
+                                        <span class="badge bg-danger">@order.Status</span>
+                                        break;
+                                }
+                            </div>
+                        </div>
+
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h6 class="fw-bold mb-3">Order Items (@order.Items.Count)</h6>
+                                    <div class="list-group list-group-flush">
+                                        @foreach (var item in order.Items)
+                                        {
+                                            <div class="list-group-item px-0 d-flex align-items-center">
+                                                <span class="badge bg-secondary me-3">@item.Qty×</span>
+                                                <div class="flex-grow-1">
+                                                    <div class="fw-bold">@item.Name</div>
+                                                    @if (!string.IsNullOrWhiteSpace(item.Sweetness) || !string.IsNullOrWhiteSpace(item.IceLevel))
+                                                    {
+                                                        <small class="text-muted">
+                                                            @if (!string.IsNullOrWhiteSpace(item.Sweetness))
+                                                            {
+                                                                <span>Sweet: @item.Sweetness</span>
+                                                            }
+                                                            @if (!string.IsNullOrWhiteSpace(item.IceLevel))
+                                                            {
+                                                                <span> | Ice: @item.IceLevel</span>
+                                                            }
+                                                        </small>
+                                                    }
+                                                </div>
+                                                <span class="text-muted">RM @item.LineTotal.ToString("F2")</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h6 class="fw-bold mb-3">Order Summary</h6>
+
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span class="text-muted">Subtotal:</span>
+                                                <span>RM @order.Subtotal.ToString("F2")</span>
+                                            </div>
+
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span class="text-muted">Service Tax:</span>
+                                                <span>RM @order.ServiceTax.ToString("F2")</span>
+                                            </div>
+
+                                            <div class="d-flex justify-content-between mb-3">
+                                                <span class="text-muted">SST:</span>
+                                                <span>RM @order.SST.ToString("F2")</span>
+                                            </div>
+
+                                            <hr />
+
+                                            <div class="d-flex justify-content-between mb-3">
+                                                <strong>Total:</strong>
+                                                <strong class="text-success">RM @order.GrandTotal.ToString("F2")</strong>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <small class="text-muted">Payment:</small><br />
+                                                <strong>@order.PaymentMethod</strong>
+                                                @if (!string.IsNullOrWhiteSpace(order.PaymentProvider))
+                                                {
+                                                    <br />
+                                        
+                                                    <small>via @order.PaymentProvider</small>
+                                                }
+                                            </div>
+
+                                            @if (order.Status != "Completed" && order.Status != "Cancelled")
+                                            {
+                                                <a asp-controller="Orders" asp-action="Track" asp-route-id="@order.Id"
+                                                   class="btn btn-primary w-100">
+                                                    <i class="bi bi-geo-alt"></i> Track Order
+                                                </a>
+                                            }
+
+                                            @if (!string.IsNullOrWhiteSpace(order.CancellationReason))
+                                            {
+                                                <div class="alert alert-danger mt-3 mb-0">
+                                                    <strong>Cancelled:</strong><br />
+                                                    <small>@order.CancellationReason</small>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>

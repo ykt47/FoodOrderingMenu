@@ -1,0 +1,72 @@
+﻿@model List<FoodOrderingMenu.Models.CartItem>
+@{
+    ViewData["Title"] = "Cart";
+}
+
+<div class="container py-4" style="max-width:900px;">
+    <h2 class="fw-bold mb-3">Your Cart</h2>
+
+    @if (!Model.Any())
+    {
+        <div class="card p-4 text-center shadow-sm border-0">
+            <h5 class="mb-2">No items in cart</h5>
+            <p class="text-muted mb-3">Browse the menu and add something you like.</p>
+            <a class="btn btn-dark px-4" asp-controller="Menu" asp-action="Index">Back to Menu</a>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm border-0">
+            <div class="p-3">
+                @foreach (var item in Model)
+                {
+                    <div class="d-flex align-items-center py-3 border-bottom">
+                        <img src="@item.ImageUrl" style="width:72px;height:72px;object-fit:cover;border-radius:12px;" class="me-3" />
+
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">@item.Name</div>
+
+                            @if (!string.IsNullOrWhiteSpace(item.Sweetness) || !string.IsNullOrWhiteSpace(item.IceLevel))
+                            {
+                                <div class="text-muted small">
+                                    Sweetness: @(item.Sweetness ?? "-") | Ice: @(item.IceLevel ?? "-")
+                                </div>
+                            }
+
+                            <div class="text-muted small">RM @item.UnitPrice.ToString("F2") each</div>
+                        </div>
+
+                        <form asp-controller="Cart" asp-action="UpdateQty" method="post" class="d-flex align-items-center gap-2">
+                            <input type="hidden" name="id" value="@item.MenuItemId" />
+                            <input type="hidden" name="sweet" value="@item.Sweetness" />
+                            <input type="hidden" name="ice" value="@item.IceLevel" />
+
+                            <input name="qty" type="number" min="1" value="@item.Qty"
+                                   class="form-control" style="width:90px;" />
+                            <button class="btn btn-outline-dark">Update</button>
+                        </form>
+
+                        <div class="ms-3 fw-bold" style="min-width:110px;text-align:right;">
+                            RM @item.LineTotal.ToString("F2")
+                        </div>
+
+                        <form asp-controller="Cart" asp-action="Remove" method="post" class="ms-3">
+                            <input type="hidden" name="id" value="@item.MenuItemId" />
+                            <input type="hidden" name="sweet" value="@item.Sweetness" />
+                            <input type="hidden" name="ice" value="@item.IceLevel" />
+                            <button class="btn btn-link text-danger">Remove</button>
+                        </form>
+                    </div>
+                }
+            </div>
+
+            <div class="p-3 d-flex justify-content-between align-items-center">
+                <form asp-controller="Cart" asp-action="Clear" method="post">
+                    <button class="btn btn-outline-secondary">Clear Cart</button>
+                </form>
+
+                <a class="btn btn-dark px-4" asp-controller="Checkout" asp-action="Index">Checkout</a>
+            </div>
+        </div>
+    }
+</div>

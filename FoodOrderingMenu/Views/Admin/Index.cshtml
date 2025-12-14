@@ -1,0 +1,82 @@
+﻿@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Admin Dashboard";
+}
+
+<div class="container py-4">
+
+    <h2 class="fw-bold mb-4">Admin Dashboard</h2>
+
+    <!-- Summary Cards -->
+    <div class="row g-4 mb-4">
+
+        <div class="col-md-4">
+            <div class="card shadow-sm text-center p-4 border-primary">
+                <h5 class="text-muted">Total Users</h5>
+                <h2 class="fw-bold text-primary">@ViewBag.TotalUsers</h2>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm text-center p-4 border-success">
+                <h5 class="text-muted">Total Orders</h5>
+                <h2 class="fw-bold text-success">@ViewBag.TotalOrders</h2>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm text-center p-4 border-warning">
+                <h5 class="text-muted">Total Categories</h5>
+                <h2 class="fw-bold text-warning">@((int)ViewBag.TotalCategories)</h2>
+            </div>
+        </div>
+
+    </div>
+
+
+    <!-- Best Selling Items Chart -->
+    <div class="card shadow-sm p-4">
+        <h4 class="fw-bold mb-3">Top 5 Best-Selling Menu Items</h4>
+        <canvas id="bestSellingChart" style="height:350px;"></canvas>
+    </div>
+
+</div>
+
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        const bestSellingLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.BestSellingLabels));
+        const bestSellingValues = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.BestSellingValues));
+
+        const ctx = document.getElementById('bestSellingChart').getContext('2d');
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: bestSellingLabels,
+                datasets: [{
+                    label: 'Quantity Sold',
+                    data: bestSellingValues,
+                    backgroundColor: [
+                        '#007bffcc',
+                        '#6610f2cc',
+                        '#6f42c1cc',
+                        '#e83e8ccc',
+                        '#fd7e14cc'
+                    ],
+                    borderColor: '#222',
+                    borderWidth: 1,
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    </script>
+}

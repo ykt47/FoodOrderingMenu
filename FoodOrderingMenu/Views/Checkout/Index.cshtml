@@ -1,0 +1,113 @@
+﻿@model FoodOrderingMenu.Models.CheckoutViewModel
+@{
+    ViewData["Title"] = "Checkout";
+}
+
+<div class="container py-4" style="max-width:900px;">
+    <h2 class="fw-bold mb-3">Checkout</h2>
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+
+    <div class="row g-4">
+        <div class="col-md-7">
+            <div class="card shadow-sm border-0">
+                <div class="p-3">
+                    <h5 class="fw-semibold mb-3">Order Summary</h5>
+
+                    @foreach (var item in Model.Items)
+                    {
+                        <div class="d-flex align-items-center py-2 border-bottom">
+                            <img src="@item.ImageUrl" style="width:64px;height:64px;object-fit:cover;border-radius:12px;" class="me-3" />
+
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">@item.Name</div>
+                                <div class="text-muted small">
+                                    Qty: @item.Qty
+                                    @if (!string.IsNullOrWhiteSpace(item.Sweetness) || !string.IsNullOrWhiteSpace(item.IceLevel))
+                                    {
+                                        <span> | Sweet: @(item.Sweetness ?? "-") | Ice: @(item.IceLevel ?? "-")</span>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="fw-bold">RM @item.LineTotal.ToString("F2")</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-5">
+            <div class="card shadow-sm border-0">
+                <div class="p-3">
+                    <h5 class="fw-semibold mb-3">Payment</h5>
+
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Subtotal</span>
+                        <span class="fw-semibold">RM @Model.Subtotal.ToString("F2")</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Service Tax (10%)</span>
+                        <span class="fw-semibold">RM @Model.ServiceTax.ToString("F2")</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span class="text-muted">SST (6%)</span>
+                        <span class="fw-semibold">RM @Model.SST.ToString("F2")</span>
+                    </div>
+
+                    <hr />
+                    <div class="d-flex justify-content-between mb-3">
+                        <span class="fw-bold">Total</span>
+                        <span class="fw-bold">RM @Model.GrandTotal.ToString("F2")</span>
+                    </div>
+
+                    <form asp-action="Pay" method="post">
+                        @Html.AntiForgeryToken()
+
+                        <div class="mb-2">
+                            <label class="form-label">Payment Method</label>
+
+                            <select id="payMethod" name="PaymentMethod" class="form-select">
+                                <option value="PayAtCounter">Pay at Counter</option>
+                                <option value="Card">Credit / Debit Card</option>
+                                <option value="EWallet">E-Wallet</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3 d-none" id="ewalletBox">
+                            <label class="form-label">Choose E-Wallet</label>
+                            <select name="EWalletProvider" class="form-select">
+                                <option value="">-- Select --</option>
+                                <option value="TouchNGo">Touch 'n Go</option>
+                                <option value="GrabPay">GrabPay</option>
+                                <option value="Boost">Boost</option>
+                                <option value="ShopeePay">ShopeePay</option>
+                            </select>
+                        </div>
+
+                        <button class="btn btn-dark w-100 py-2">Pay & Place Order</button>
+                        <a class="btn btn-link w-100 mt-2" asp-controller="Cart" asp-action="Index">Back to Cart</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const payMethod = document.getElementById("payMethod");
+        const ewalletBox = document.getElementById("ewalletBox");
+
+        function toggleEwallet() {
+            if (payMethod.value === "EWallet") ewalletBox.classList.remove("d-none");
+            else ewalletBox.classList.add("d-none");
+        }
+
+        payMethod.addEventListener("change", toggleEwallet);
+        toggleEwallet();
+    </script>
+}

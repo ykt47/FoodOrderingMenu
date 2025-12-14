@@ -1,0 +1,284 @@
+﻿@model IEnumerable<FoodOrderingMenu.Models.Order>
+@{
+    ViewData["Title"] = "Order Management";
+    Layout = "_Layout";
+}
+
+<div class="container-fluid py-4">
+    <h2 class="fw-bold mb-4">Order Management</h2>
+
+    <!-- Status Filter Tabs -->
+    <ul class="nav nav-pills mb-4">
+        <li class="nav-item">
+            <a class="nav-link @(ViewBag.CurrentStatus == "All" ? "active" : "")"
+               asp-action="Index" asp-route-status="All">
+                All Orders <span class="badge bg-secondary ms-1">@(ViewBag.PendingCount + ViewBag.PreparingCount + ViewBag.ReadyCount)</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(ViewBag.CurrentStatus == "Received" ? "active" : "")"
+               asp-action="Index" asp-route-status="Received">
+                Received <span class="badge bg-primary ms-1">@ViewBag.ReceivedCount</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(ViewBag.CurrentStatus == "Pending" ? "active" : "")"
+               asp-action="Index" asp-route-status="Pending">
+                Pending <span class="badge bg-warning ms-1">@ViewBag.PendingCount</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(ViewBag.CurrentStatus == "Preparing" ? "active" : "")"
+               asp-action="Index" asp-route-status="Preparing">
+                Preparing <span class="badge bg-info ms-1">@ViewBag.PreparingCount</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(ViewBag.CurrentStatus == "Ready" ? "active" : "")"
+               asp-action="Index" asp-route-status="Ready">
+                Ready <span class="badge bg-success ms-1">@ViewBag.ReadyCount</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(ViewBag.CurrentStatus == "Completed" ? "active" : "")"
+               asp-action="Index" asp-route-status="Completed">
+                Completed <span class="badge bg-dark ms-1">@ViewBag.CompletedCount</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(ViewBag.CurrentStatus == "Cancelled" ? "active" : "")"
+               asp-action="Index" asp-route-status="Cancelled">
+                Cancelled <span class="badge bg-danger ms-1">@ViewBag.CancelledCount</span>
+            </a>
+        </li>
+    </ul>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Orders Table -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 100px;">Order #</th>
+                            <th style="width: 150px;">Date/Time</th>
+                            <th>Customer</th>
+                            <th>Items</th>
+                            <th style="width: 120px;">Total</th>
+                            <th style="width: 130px;">Payment</th>
+                            <th style="width: 130px;">Status</th>
+                            <th style="width: 200px;" class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-4 text-muted">
+                                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                    No orders found
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var order in Model)
+                            {
+                                <tr>
+                                    <td class="fw-bold">#@order.Id</td>
+                                    <td>
+                                        <small>@order.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</small><br />
+                                        <small class="text-muted">@order.CreatedAt.ToLocalTime().ToString("hh:mm tt")</small>
+                                    </td>
+                                    <td>
+                                        @if (order.User != null)
+                                        {
+                                            <div>@order.User.FullName</div>
+                                            <small class="text-muted">@order.User.Email</small>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Guest</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <small>@order.Items.Count item(s)</small>
+                                    </td>
+                                    <td class="fw-bold">RM @order.GrandTotal.ToString("F2")</td>
+                                    <td>
+                                        <span class="badge bg-secondary">@order.PaymentMethod</span>
+                                        @if (!string.IsNullOrWhiteSpace(order.PaymentProvider))
+                                        {
+                                            <br />
+                                
+                                            <small class="text-muted">@order.PaymentProvider</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        @switch (order.Status)
+                                        {
+                                            case "Received":
+                                                <span class="badge bg-primary">@order.Status</span>
+                                                break;
+                                            case "Pending":
+                                                <span class="badge bg-warning text-dark">@order.Status</span>
+                                                break;
+                                            case "Preparing":
+                                                <span class="badge bg-info">@order.Status</span>
+                                                break;
+                                            case "Ready":
+                                                <span class="badge bg-success">@order.Status</span>
+                                                break;
+                                            case "Completed":
+                                                <span class="badge bg-dark">@order.Status</span>
+                                                break;
+                                            case "Cancelled":
+                                                <span class="badge bg-danger">@order.Status</span>
+                                                break;
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group btn-group-sm">
+                                            <a class="btn btn-outline-primary"
+                                               asp-action="Details"
+                                               asp-route-id="@order.Id"
+                                               title="View Details">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+
+                                            @if (order.Status != "Completed" && order.Status != "Cancelled")
+                                            {
+                                                <button class="btn btn-outline-success btn-next-status"
+                                                        data-order-id="@order.Id"
+                                                        title="Move to Next Status">
+                                                    <i class="bi bi-arrow-right-circle"></i>
+                                                </button>
+
+                                                <button class="btn btn-outline-danger btn-cancel"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#cancelModal"
+                                                        data-order-id="@order.Id"
+                                                        title="Cancel Order">
+                                                    <i class="bi bi-x-circle"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Order Modal -->
+<div class="modal fade" id="cancelModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form asp-action="Cancel" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="cancelOrderId" name="id" />
+
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Cancel Order</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <p>Are you sure you want to cancel this order?</p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Cancellation Reason</label>
+                        <textarea name="cancellationReason"
+                                  class="form-control"
+                                  rows="3"
+                                  placeholder="Enter reason for cancellation..."
+                                  required></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-danger">Cancel Order</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Handle cancel button click
+        document.querySelectorAll('.btn-cancel').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const orderId = this.getAttribute('data-order-id');
+                document.getElementById('cancelOrderId').value = orderId;
+            });
+        });
+
+        // Handle next status button with AJAX
+        document.querySelectorAll('.btn-next-status').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const orderId = this.getAttribute('data-order-id');
+
+                if (!confirm('Move this order to the next status?')) return;
+
+                try {
+                    const response = await fetch('@Url.Action("MoveToNextStatus", "OrderManagement")', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                        },
+                        body: `id=${orderId}&__RequestVerificationToken=${encodeURIComponent(document.querySelector('input[name="__RequestVerificationToken"]')?.value || '')}`
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        location.reload();
+                    } else {
+                        alert(result.message || 'Failed to update order status');
+                    }
+                } catch (error) {
+                    alert('An error occurred. Please try again.');
+                    console.error(error);
+                }
+            });
+        });
+
+        // Auto-refresh every 30 seconds
+        let autoRefresh = true;
+        setInterval(() => {
+            if (autoRefresh && document.visibilityState === 'visible') {
+                location.reload();
+            }
+        }, 30000);
+
+        // Pause auto-refresh when modal is open
+        document.getElementById('cancelModal')?.addEventListener('show.bs.modal', () => {
+            autoRefresh = false;
+        });
+        document.getElementById('cancelModal')?.addEventListener('hide.bs.modal', () => {
+            autoRefresh = true;
+        });
+    </script>
+}

@@ -1,0 +1,20 @@
+﻿@model FoodOrderingMenu.Models.MenuItem
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Delete Menu Item";
+}
+
+<div class="container py-4">
+    <h2>Delete Menu Item</h2>
+
+    <div class="alert alert-warning">
+        Are you sure you want to delete item "<strong>@Model.Name</strong>"?
+    </div>
+
+    <form asp-action="Delete" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="Id" />
+        <button class="btn btn-danger" type="submit">Yes, delete</button>
+        <a asp-action="Index" class="btn btn-secondary ms-2">Cancel</a>
+    </form>
+</div>

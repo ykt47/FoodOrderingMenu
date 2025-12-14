@@ -1,0 +1,164 @@
+﻿@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Welcome";
+}
+
+<style>
+    /* ---------- Hero Section ---------- */
+    .hero-section {
+        position: relative;
+        height: 65vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: white;
+        background-size: cover;
+        background-position: center;
+    }
+
+    .hero-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+    }
+
+    .hero-content {
+        position: relative;
+        z-index: 2;
+    }
+
+    /* ---------- Category Cards ---------- */
+    .menu-card {
+        border-radius: 14px;
+        overflow: hidden;
+        transition: transform 0.35s ease, box-shadow 0.35s ease;
+        background: white;
+    }
+
+        .menu-card img {
+            height: 200px;
+            object-fit: cover;
+            transition: transform 0.4s ease;
+        }
+
+        .menu-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 18px 28px rgba(0, 0, 0, 0.2);
+        }
+
+            .menu-card:hover img {
+                transform: scale(1.08);
+            }
+
+    /* ---------- Section Title ---------- */
+    .section-title {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 1.8rem;
+        position: relative;
+        display: inline-block;
+    }
+
+        .section-title::after {
+            content: "";
+            width: 70px;
+            height: 4px;
+            background: #f7c04a;
+            display: block;
+            margin: 8px auto 0;
+            border-radius: 2px;
+        }
+</style>
+
+<!-- ================= Hero Section ================= -->
+<div class="hero-section" style="background-image:url('/images/hero-food.jpg')">
+    <div class="hero-overlay"></div>
+
+    <div class="hero-content">
+        <h1 class="display-4 fw-bold">Experience Delicious Moments</h1>
+        <p class="lead">Freshly crafted meals, prepared just for you</p>
+
+        <a asp-controller="Menu" asp-action="Index"
+           class="btn btn-warning btn-lg mt-3 px-4 py-2 shadow">
+            Order Now
+        </a>
+    </div>
+</div>
+
+<!-- ================= Popular Categories ================= -->
+<div class="container py-5">
+    <h2 class="text-center section-title">Popular Categories</h2>
+
+    <div class="row g-4 mt-4">
+
+        <div class="col-md-4">
+            <div class="menu-card shadow-sm">
+                <img src="/images/category1.jpg" class="w-100" />
+                <div class="p-3">
+                    <h5 class="fw-bold">Burgers</h5>
+                    <a asp-controller="Menu" asp-action="Index"
+                       class="btn btn-outline-primary w-100 mt-2">
+                        View Menu
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="menu-card shadow-sm">
+                <img src="/images/category2.jpg" class="w-100" />
+                <div class="p-3">
+                    <h5 class="fw-bold">Pasta</h5>
+                    <a asp-controller="Menu" asp-action="Index"
+                       class="btn btn-outline-primary w-100 mt-2">
+                        View Menu
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="menu-card shadow-sm">
+                <img src="/images/category3.jpg" class="w-100" />
+                <div class="p-3">
+                    <h5 class="fw-bold">Beverages</h5>
+                    <a asp-controller="Menu" asp-action="Index"
+                       class="btn btn-outline-primary w-100 mt-2">
+                        View Menu
+                    </a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ================= Pax Selection Modal ================= -->
+<div class="modal fade" id="paxModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content p-3">
+            <h4 class="text-center mb-3">No. of Pax</h4>
+
+            <div class="d-flex justify-content-center mb-3">
+                <select id="paxSelect" class="form-select w-50">
+                    <option value="">Select</option>
+                    @for (var i = 1; i <= 8; i++)
+                    {
+                        <option value="@i">@i Pax</option>
+                    }
+                </select>
+            </div>
+
+            <button class="btn btn-primary w-100" data-bs-dismiss="modal">Confirm</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Auto-show Pax Modal on page load
+        var paxModal = new bootstrap.Modal(document.getElementById("paxModal"));
+        paxModal.show();
+    </script>
+}

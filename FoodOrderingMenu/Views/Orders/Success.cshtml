@@ -1,0 +1,148 @@
+﻿@model FoodOrderingMenu.Models.Order
+@{
+    ViewData["Title"] = "Order Success";
+}
+
+<div class="container py-5" style="max-width:800px;">
+    <!-- Success Message -->
+    <div class="text-center mb-4">
+        <div class="success-icon mb-3">
+            <i class="bi bi-check-circle-fill text-success" style="font-size: 80px;"></i>
+        </div>
+
+        <h2 class="fw-bold mt-4 mb-2">Order Placed Successfully! 🎉</h2>
+        <p class="text-muted mb-4">Your order has been received and is being processed.</p>
+    </div>
+
+    <!-- Order Details Card -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+            <!-- Order ID & Status -->
+            <div class="text-center mb-4 pb-4 border-bottom">
+                <div class="text-muted small mb-2">Order Number</div>
+                <h3 class="fw-bold mb-3">#@Model.Id</h3>
+                <span class="badge bg-primary px-3 py-2">
+                    <i class="bi bi-clock-history"></i> @Model.Status
+                </span>
+            </div>
+
+            <!-- Order Info -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-calendar-check text-primary me-3 fs-5"></i>
+                        <div>
+                            <div class="text-muted small">Order Date</div>
+                            <div class="fw-semibold">@Model.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-credit-card text-success me-3 fs-5"></i>
+                        <div>
+                            <div class="text-muted small">Payment Method</div>
+                            <div class="fw-semibold">
+                                @Model.PaymentMethod
+                                @if (!string.IsNullOrWhiteSpace(Model.PaymentProvider))
+                                {
+                                    <br />
+                                
+                                    <small class="text-muted">via @Model.PaymentProvider</small>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Items Summary -->
+            <div class="mb-4">
+                <h6 class="fw-bold mb-3">
+                    <i class="bi bi-bag-check"></i> Order Items (@Model.Items.Count)
+                </h6>
+                <div class="list-group list-group-flush">
+                    @foreach (var item in Model.Items)
+                    {
+                        <div class="list-group-item px-0 d-flex align-items-center">
+                            <span class="badge bg-secondary me-3">@item.Qty×</span>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">@item.Name</div>
+                                @if (!string.IsNullOrWhiteSpace(item.Sweetness) || !string.IsNullOrWhiteSpace(item.IceLevel))
+                                {
+                                    <small class="text-muted">
+                                        @if (!string.IsNullOrWhiteSpace(item.Sweetness))
+                                        {
+                                            <span>Sweet: @item.Sweetness</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(item.IceLevel))
+                                        {
+                                            <span> | Ice: @item.IceLevel</span>
+                                        }
+                                    </small>
+                                }
+                            </div>
+                            <span class="text-muted">RM @item.LineTotal.ToString("F2")</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Total -->
+            <div class="border-top pt-3">
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Subtotal</span>
+                    <span>RM @Model.Subtotal.ToString("F2")</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Service Tax (10%)</span>
+                    <span>RM @Model.ServiceTax.ToString("F2")</span>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="text-muted">SST (6%)</span>
+                    <span>RM @Model.SST.ToString("F2")</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <strong class="fs-5">Grand Total</strong>
+                    <strong class="fs-5 text-success">RM @Model.GrandTotal.ToString("F2")</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="d-flex flex-column gap-2">
+        <a asp-controller="Orders" asp-action="Track" asp-route-id="@Model.Id"
+           class="btn btn-primary btn-lg">
+            <i class="bi bi-geo-alt"></i> Track Your Order
+        </a>
+
+        @if (User.Identity?.IsAuthenticated ?? false)
+        {
+            <a asp-controller="Reports" asp-action="MyOrders" class="btn btn-outline-secondary">
+                <i class="bi bi-clock-history"></i> View All My Orders
+            </a>
+        }
+
+        <a asp-controller="Menu" asp-action="Index" class="btn btn-outline-dark">
+            <i class="bi bi-arrow-left"></i> Back to Menu
+        </a>
+    </div>
+
+    <!-- Info Box -->
+    <div class="alert alert-info mt-4">
+        <h6 class="alert-heading">
+            <i class="bi bi-info-circle"></i> What's Next?
+        </h6>
+        <ul class="mb-0 ps-3">
+            <li>Your order is being prepared in our kitchen</li>
+            <li>You'll be notified when it's ready for pickup</li>
+            <li>Track your order status anytime using the button above</li>
+            @if (Model.PaymentMethod == "PayAtCounter")
+            {
+                <li><strong>Payment:</strong> Please pay at the counter when collecting your order</li>
+            }
+        </ul>
+    </div>
+</div>  

@@ -1,0 +1,155 @@
+﻿@model FoodOrderingMenu.Models.Order
+@{
+    ViewData["Title"] = "Track Order";
+
+    string status = (Model.Status ?? "Received").ToLowerInvariant();
+    bool step1 = true;
+    bool step2 = status == "pending" || status == "preparing" || status == "ready" || status == "completed";
+    bool step3 = status == "preparing" || status == "ready" || status == "completed";
+    bool step4 = status == "ready" || status == "completed";
+    bool step5 = status == "completed";
+    bool isCancelled = status == "cancelled";
+}
+
+<div class="container py-5" style="max-width:900px;">
+    <h2 class="fw-bold mb-3">
+        <i class="bi bi-geo-alt"></i> Track Order #@Model.Id
+    </h2>
+
+    @if (isCancelled)
+    {
+        <div class="alert alert-danger">
+            <h5><i class="bi bi-x-circle"></i> Order Cancelled</h5>
+            @if (!string.IsNullOrWhiteSpace(Model.CancellationReason))
+            {
+                <p class="mb-0"><strong>Reason:</strong> @Model.CancellationReason</p>
+            }
+        </div>
+    }
+
+    <div class="card shadow-sm border-0 p-4 mb-4">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <div class="text-muted small">Order Date</div>
+                <div class="fw-semibold">@Model.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</div>
+                <div class="text-muted small">@Model.CreatedAt.ToLocalTime().ToString("hh:mm tt")</div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-muted small">Payment Method</div>
+                <div class="fw-semibold">@Model.PaymentMethod</div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-muted small">Total Amount</div>
+                <div class="fw-semibold text-success fs-5">RM @Model.GrandTotal.ToString("F2")</div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-muted small">Current Status</div>
+                <div class="fw-semibold">
+                    <span class="badge @(status == "received" ? "bg-primary" : status == "pending" ? "bg-warning text-dark" : status == "preparing" ? "bg-info" : status == "ready" ? "bg-success" : status == "completed" ? "bg-dark" : "bg-danger")">
+                        @Model.Status
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!isCancelled)
+    {
+        <div class="card shadow-sm border-0 p-4 mb-4">
+            <h5 class="fw-semibold mb-4">Order Progress</h5>
+            <div class="progress-steps">
+                <div class="step @(step1 ? "completed" : "")">
+                    <div class="step-icon"><i class="bi bi-check-circle-fill"></i></div>
+                    <div class="step-label">Received</div>
+                </div>
+                <div class="step @(step2 ? "completed" : "")">
+                    <div class="step-icon"><i class="bi bi-check-circle-fill"></i></div>
+                    <div class="step-label">Pending</div>
+                </div>
+                <div class="step @(step3 ? "completed" : "")">
+                    <div class="step-icon"><i class="bi bi-check-circle-fill"></i></div>
+                    <div class="step-label">Preparing</div>
+                </div>
+                <div class="step @(step4 ? "completed" : "")">
+                    <div class="step-icon"><i class="bi bi-check-circle-fill"></i></div>
+                    <div class="step-label">Ready</div>
+                </div>
+                <div class="step @(step5 ? "completed" : "")">
+                    <div class="step-icon"><i class="bi bi-check-circle-fill"></i></div>
+                    <div class="step-label">Completed</div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="d-flex gap-2 justify-content-center">
+        <a asp-controller="Menu" asp-action="Index" class="btn btn-outline-primary">Back to Menu</a>
+        @if (User.Identity?.IsAuthenticated ?? false)
+        {
+            <a asp-controller="Reports" asp-action="MyOrders" class="btn btn-outline-secondary">My Orders</a>
+        }
+    </div>
+</div>
+
+<style>
+    .progress-steps {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+        padding: 20px 0;
+    }
+
+    .step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+        position: relative;
+    }
+
+    .step-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: #e9ecef;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        color: #6c757d;
+        margin-bottom: 10px;
+        z-index: 2;
+    }
+
+    .step.completed .step-icon {
+        background: #198754;
+        color: white;
+    }
+
+    .step-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: #6c757d;
+    }
+
+    .step.completed .step-label {
+        color: #198754;
+        font-weight: 600;
+    }
+
+    .step:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        top: 25px;
+        left: calc(50% + 25px);
+        right: calc(-50% + 25px);
+        height: 3px;
+        background: #e9ecef;
+        z-index: 1;
+    }
+
+    .step.completed:not(:last-child)::after {
+        background: #198754;
+    }
+</style>
