@@ -53,9 +53,6 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    // Apply migrations automatically (safe)
-    db.Database.Migrate();
-
     // Seed ONLY the admin user if missing
     if (!db.Users.Any(u => u.Role == "Admin"))
     {

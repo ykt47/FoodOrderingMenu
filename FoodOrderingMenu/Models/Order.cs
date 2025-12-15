@@ -31,5 +31,11 @@ namespace FoodOrderingMenu.Models
         public DateTime? CompletedAt { get; set; }
         public string? CancellationReason { get; set; }
         public List<OrderItem> Items { get; set; } = new();
+
+        public int? DiscountCodeId { get; set; }
+        public DiscountCode? DiscountCode { get; set; }
+
+        [Column(TypeName = "decimal(10,2)")]
+        public decimal DiscountAmount { get; set; } = 0;
     }
 }

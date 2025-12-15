@@ -3,111 +3,675 @@
     ViewData["Title"] = "Checkout";
 }
 
-<div class="container py-4" style="max-width:900px;">
-    <h2 class="fw-bold mb-3">Checkout</h2>
+<div class="container py-4" style="max-width:1200px;">
+    <h2 class="fw-bold mb-4">
+        <i class="bi bi-credit-card"></i> Secure Checkout
+    </h2>
 
     @if (TempData["Error"] != null)
     {
-        <div class="alert alert-danger">@TempData["Error"]</div>
+        <div class="alert alert-danger alert-dismissible fade show">
+            <i class="bi bi-exclamation-triangle"></i> @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
     }
 
-    <div class="row g-4">
-        <div class="col-md-7">
-            <div class="card shadow-sm border-0">
-                <div class="p-3">
-                    <h5 class="fw-semibold mb-3">Order Summary</h5>
+    <form asp-action="Pay" method="post" id="checkoutForm">
+        @Html.AntiForgeryToken()
 
-                    @foreach (var item in Model.Items)
-                    {
-                        <div class="d-flex align-items-center py-2 border-bottom">
-                            <img src="@item.ImageUrl" style="width:64px;height:64px;object-fit:cover;border-radius:12px;" class="me-3" />
+        <div class="row g-4">
+            <!-- LEFT: Payment Method Selection -->
+            <div class="col-lg-7">
 
-                            <div class="flex-grow-1">
-                                <div class="fw-semibold">@item.Name</div>
-                                <div class="text-muted small">
-                                    Qty: @item.Qty
-                                    @if (!string.IsNullOrWhiteSpace(item.Sweetness) || !string.IsNullOrWhiteSpace(item.IceLevel))
-                                    {
-                                        <span> | Sweet: @(item.Sweetness ?? "-") | Ice: @(item.IceLevel ?? "-")</span>
-                                    }
+                <!-- Payment Method Selection -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-wallet2"></i> Select Payment Method</h5>
+                    </div>
+                    <div class="card-body p-4">
+
+                        <div class="payment-methods">
+                            <!-- Pay at Counter -->
+                            <div class="payment-option" data-method="PayAtCounter">
+                                <input type="radio" name="PaymentMethod" value="PayAtCounter" id="payCounter" checked>
+                                <label for="payCounter" class="payment-label">
+                                    <div class="payment-icon">
+                                        <i class="bi bi-cash-stack"></i>
+                                    </div>
+                                    <div class="payment-info">
+                                        <div class="payment-title">Pay at Counter</div>
+                                        <div class="payment-desc">Cash payment when you collect your order</div>
+                                    </div>
+                                    <div class="payment-check">
+                                        <i class="bi bi-check-circle-fill"></i>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <!-- Credit/Debit Card -->
+                            <div class="payment-option" data-method="Card">
+                                <input type="radio" name="PaymentMethod" value="Card" id="payCard">
+                                <label for="payCard" class="payment-label">
+                                    <div class="payment-icon">
+                                        <i class="bi bi-credit-card-2-front"></i>
+                                    </div>
+                                    <div class="payment-info">
+                                        <div class="payment-title">Credit / Debit Card</div>
+                                        <div class="payment-desc">Visa, Mastercard, Amex</div>
+                                    </div>
+                                    <div class="payment-check">
+                                        <i class="bi bi-check-circle-fill"></i>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <!-- E-Wallet -->
+                            <div class="payment-option" data-method="EWallet">
+                                <input type="radio" name="PaymentMethod" value="EWallet" id="payEwallet">
+                                <label for="payEwallet" class="payment-label">
+                                    <div class="payment-icon">
+                                        <i class="bi bi-phone"></i>
+                                    </div>
+                                    <div class="payment-info">
+                                        <div class="payment-title">E-Wallet</div>
+                                        <div class="payment-desc">Touch 'n Go, GrabPay, Boost, ShopeePay</div>
+                                    </div>
+                                    <div class="payment-check">
+                                        <i class="bi bi-check-circle-fill"></i>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Card Details (Hidden by default) -->
+                <div class="card shadow-sm mb-4 payment-details" id="cardDetails" style="display:none;">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="bi bi-shield-check"></i> Card Details</h5>
+                    </div>
+                    <div class="card-body p-4">
+
+                        <!-- Card Number -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Card Number</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-credit-card"></i></span>
+                                <input type="text"
+                                       name="CardNumber"
+                                       id="cardNumber"
+                                       class="form-control form-control-lg"
+                                       placeholder="1234 5678 9012 3456"
+                                       maxlength="19"
+                                       autocomplete="cc-number">
+                                <span class="input-group-text" id="cardBrand">
+                                    <i class="bi bi-credit-card text-muted"></i>
+                                </span>
+                            </div>
+                            <small class="text-muted">Enter 16-digit card number</small>
+                        </div>
+
+                        <!-- Card Holder Name -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Card Holder Name</label>
+                            <input type="text"
+                                   name="CardHolderName"
+                                   class="form-control form-control-lg"
+                                   placeholder="JOHN DOE"
+                                   autocomplete="cc-name"
+                                   style="text-transform: uppercase;">
+                        </div>
+
+                        <!-- Expiry & CVV -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Expiry Date</label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <select name="ExpiryMonth" class="form-select form-select-lg" autocomplete="cc-exp-month">
+                                            <option value="">MM</option>
+                                            @for (int i = 1; i <= 12; i++)
+                                            {
+                                                <option value="@i.ToString("00")">@i.ToString("00")</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <select name="ExpiryYear" class="form-select form-select-lg" autocomplete="cc-exp-year">
+                                            <option value="">YY</option>
+                                            @for (int i = DateTime.Now.Year; i <= DateTime.Now.Year + 15; i++)
+                                            {
+                                                <option value="@i">@i</option>
+                                            }
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="fw-bold">RM @item.LineTotal.ToString("F2")</div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">CVV</label>
+                                <input type="text"
+                                       name="CVV"
+                                       class="form-control form-control-lg"
+                                       placeholder="123"
+                                       maxlength="4"
+                                       autocomplete="cc-csc">
+                                <small class="text-muted">3-4 digits on back</small>
+                            </div>
                         </div>
-                    }
+
+                        <!-- Security Badge -->
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-shield-lock-fill"></i>
+                            <strong>Secure Payment:</strong> Your card details are encrypted and secure
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- E-Wallet Details (Hidden by default) -->
+                <div class="card shadow-sm mb-4 payment-details" id="ewalletDetails" style="display:none;">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="bi bi-phone-vibrate"></i> E-Wallet Details</h5>
+                    </div>
+                    <div class="card-body p-4">
+
+                        <!-- E-Wallet Provider -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Select Provider</label>
+                            <div class="ewallet-providers">
+                                <label class="ewallet-option">
+                                    <input type="radio" name="EWalletProvider" value="TouchNGo">
+                                    <div class="ewallet-card">
+                                        <i class="bi bi-phone-fill"></i>
+                                        <span>Touch 'n Go</span>
+                                    </div>
+                                </label>
+                                <label class="ewallet-option">
+                                    <input type="radio" name="EWalletProvider" value="GrabPay">
+                                    <div class="ewallet-card">
+                                        <i class="bi bi-phone-fill"></i>
+                                        <span>GrabPay</span>
+                                    </div>
+                                </label>
+                                <label class="ewallet-option">
+                                    <input type="radio" name="EWalletProvider" value="Boost">
+                                    <div class="ewallet-card">
+                                        <i class="bi bi-phone-fill"></i>
+                                        <span>Boost</span>
+                                    </div>
+                                </label>
+                                <label class="ewallet-option">
+                                    <input type="radio" name="EWalletProvider" value="ShopeePay">
+                                    <div class="ewallet-card">
+                                        <i class="bi bi-phone-fill"></i>
+                                        <span>ShopeePay</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Phone Number -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Phone Number</label>
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text">+60</span>
+                                <input type="tel"
+                                       name="EWalletPhone"
+                                       class="form-control"
+                                       placeholder="12-345 6789"
+                                       maxlength="12">
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT: Order Summary -->
+            <div class="col-lg-5">
+                <div class="card shadow-sm sticky-top" style="top: 20px;">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="bi bi-receipt"></i> Order Summary</h5>
+                    </div>
+                    <div class="card-body p-4">
+
+                        <!-- Order Items -->
+                        <div class="order-items mb-3">
+                            @foreach (var item in Model.Items)
+                            {
+                                <div class="order-item">
+                                    <div class="item-qty">@item.Qty×</div>
+                                    <div class="item-details">
+                                        <div class="item-name">@item.Name</div>
+                                        @if (!string.IsNullOrWhiteSpace(item.Sweetness) || !string.IsNullOrWhiteSpace(item.IceLevel))
+                                        {
+                                            <small class="text-muted">
+                                                @item.Sweetness @item.IceLevel
+                                            </small>
+                                        }
+                                    </div>
+                                    <div class="item-price">RM @item.LineTotal.ToString("F2")</div>
+                                </div>
+                            }
+                        </div>
+
+                        <hr>
+
+                        <!-- Discount Code Section -->
+                        <div class="discount-section mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-tag-fill text-warning"></i> Have a Discount Code?
+                            </label>
+
+                            @if (Model.IsDiscountApplied)
+                            {
+                                <!-- Applied Discount -->
+                                <div class="discount-applied">
+                                    <div class="alert alert-success d-flex align-items-center justify-content-between mb-0">
+                                        <div>
+                                            <i class="bi bi-check-circle-fill"></i>
+                                            <strong>@Model.DiscountCodeInput</strong> applied
+                                            <br />
+                                            <small>@Model.DiscountMessage</small>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" id="removeDiscountBtn">
+                                            <i class="bi bi-x"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <!-- Discount Input -->
+                                <div class="input-group">
+                                    <input type="text"
+                                           class="form-control"
+                                           id="discountCodeInput"
+                                           placeholder="Enter code (e.g., SAVE10)"
+                                           style="text-transform: uppercase;">
+                                    <button type="button" class="btn btn-warning" id="applyDiscountBtn">
+                                        Apply
+                                    </button>
+                                </div>
+                                <div id="discountMessage" class="mt-2" style="display:none;"></div>
+                            }
+                        </div>
+
+                        <hr>
+
+                        <!-- Price Breakdown -->
+                        <div class="price-row">
+                            <span>Subtotal</span>
+                            <span>RM @Model.Subtotal.ToString("F2")</span>
+                        </div>
+                        <div class="price-row">
+                            <span>Service Tax (10%)</span>
+                            <span>RM @Model.ServiceTax.ToString("F2")</span>
+                        </div>
+                        <div class="price-row">
+                            <span>SST (6%)</span>
+                            <span>RM @Model.SST.ToString("F2")</span>
+                        </div>
+
+                        @if (Model.IsDiscountApplied && Model.DiscountAmount > 0)
+                        {
+                            <div class="price-row discount-row">
+                                <span class="text-success"><i class="bi bi-tag-fill"></i> Discount</span>
+                                <span class="text-success">- RM @Model.DiscountAmount.ToString("F2")</span>
+                            </div>
+                        }
+
+                        <hr class="my-3">
+
+                        <div class="price-row total">
+                            <strong>Total Amount</strong>
+                            <strong class="text-success fs-4" id="finalTotal">
+                                RM @Model.FinalTotal.ToString("F2")
+                            </strong>
+                        </div>
+
+                        @if (Model.IsDiscountApplied && Model.DiscountAmount > 0)
+                        {
+                            <div class="text-center mt-2">
+                                <small class="text-success">
+                                    <i class="bi bi-piggy-bank-fill"></i>
+                                    You're saving RM @Model.DiscountAmount.ToString("F2")!
+                                </small>
+                            </div>
+                        }
+
+                        <!-- Submit Button -->
+                        <button type="submit" class="btn btn-success btn-lg w-100 mt-4" id="submitBtn">
+                            <i class="bi bi-lock-fill"></i> Complete Payment
+                        </button>
+
+                        <a asp-controller="Cart" asp-action="Index" class="btn btn-outline-secondary w-100 mt-2">
+                            <i class="bi bi-arrow-left"></i> Back to Cart
+                        </a>
+
+                    </div>
                 </div>
             </div>
+
         </div>
-
-        <div class="col-md-5">
-            <div class="card shadow-sm border-0">
-                <div class="p-3">
-                    <h5 class="fw-semibold mb-3">Payment</h5>
-
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Subtotal</span>
-                        <span class="fw-semibold">RM @Model.Subtotal.ToString("F2")</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Service Tax (10%)</span>
-                        <span class="fw-semibold">RM @Model.ServiceTax.ToString("F2")</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-3">
-                        <span class="text-muted">SST (6%)</span>
-                        <span class="fw-semibold">RM @Model.SST.ToString("F2")</span>
-                    </div>
-
-                    <hr />
-                    <div class="d-flex justify-content-between mb-3">
-                        <span class="fw-bold">Total</span>
-                        <span class="fw-bold">RM @Model.GrandTotal.ToString("F2")</span>
-                    </div>
-
-                    <form asp-action="Pay" method="post">
-                        @Html.AntiForgeryToken()
-
-                        <div class="mb-2">
-                            <label class="form-label">Payment Method</label>
-
-                            <select id="payMethod" name="PaymentMethod" class="form-select">
-                                <option value="PayAtCounter">Pay at Counter</option>
-                                <option value="Card">Credit / Debit Card</option>
-                                <option value="EWallet">E-Wallet</option>
-                            </select>
-                        </div>
-
-                        <div class="mb-3 d-none" id="ewalletBox">
-                            <label class="form-label">Choose E-Wallet</label>
-                            <select name="EWalletProvider" class="form-select">
-                                <option value="">-- Select --</option>
-                                <option value="TouchNGo">Touch 'n Go</option>
-                                <option value="GrabPay">GrabPay</option>
-                                <option value="Boost">Boost</option>
-                                <option value="ShopeePay">ShopeePay</option>
-                            </select>
-                        </div>
-
-                        <button class="btn btn-dark w-100 py-2">Pay & Place Order</button>
-                        <a class="btn btn-link w-100 mt-2" asp-controller="Cart" asp-action="Index">Back to Cart</a>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
+    </form>
 </div>
 
 @section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/cleave.js@1.6.0/dist/cleave.min.js"></script>
     <script>
-        const payMethod = document.getElementById("payMethod");
-        const ewalletBox = document.getElementById("ewalletBox");
+        // Card number formatting
+        const cardNumber = new Cleave('#cardNumber', {
+            creditCard: true,
+            onCreditCardTypeChanged: function (type) {
+                const brandIcon = document.getElementById('cardBrand');
+                let icon = 'bi-credit-card';
 
-        function toggleEwallet() {
-            if (payMethod.value === "EWallet") ewalletBox.classList.remove("d-none");
-            else ewalletBox.classList.add("d-none");
+                if (type === 'visa') icon = 'bi-credit-card text-primary';
+                else if (type === 'mastercard') icon = 'bi-credit-card text-danger';
+                else if (type === 'amex') icon = 'bi-credit-card text-info';
+
+                brandIcon.innerHTML = `<i class="bi ${icon}"></i>`;
+            }
+        });
+
+        // CVV formatting
+        const cvvInput = document.querySelector('input[name="CVV"]');
+        if (cvvInput) {
+            cvvInput.addEventListener('input', function(e) {
+                this.value = this.value.replace(/\D/g, '');
+            });
         }
 
-        payMethod.addEventListener("change", toggleEwallet);
-        toggleEwallet();
+        // Phone formatting
+        const phoneInput = document.querySelector('input[name="EWalletPhone"]');
+        if (phoneInput) {
+            phoneInput.addEventListener('input', function(e) {
+                this.value = this.value.replace(/\D/g, '');
+            });
+        }
+
+        // Discount code input uppercase
+        const discountInput = document.getElementById('discountCodeInput');
+        if (discountInput) {
+            discountInput.addEventListener('input', function() {
+                this.value = this.value.toUpperCase();
+            });
+        }
+
+        // Apply Discount
+        document.getElementById('applyDiscountBtn')?.addEventListener('click', async function() {
+            const code = discountInput.value.trim();
+            if (!code) {
+                showDiscountMessage('Please enter a discount code', 'danger');
+                return;
+            }
+
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+            try {
+                const formData = new FormData();
+                formData.append('discountCode', code);
+                formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]').value);
+
+                const response = await fetch('@Url.Action("ApplyDiscount", "Checkout")', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    location.reload(); // Reload to show applied discount
+                } else {
+                    showDiscountMessage(result.message, 'danger');
+                }
+            } catch (error) {
+                showDiscountMessage('Error applying discount code', 'danger');
+            } finally {
+                this.disabled = false;
+                this.innerHTML = 'Apply';
+            }
+        });
+
+        // Remove Discount
+        document.getElementById('removeDiscountBtn')?.addEventListener('click', async function() {
+            if (!confirm('Remove discount code?')) return;
+
+            try {
+                const formData = new FormData();
+                formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]').value);
+
+                await fetch('@Url.Action("RemoveDiscount", "Checkout")', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                location.reload();
+            } catch (error) {
+                alert('Error removing discount');
+            }
+        });
+
+        function showDiscountMessage(message, type) {
+            const msgDiv = document.getElementById('discountMessage');
+            msgDiv.className = `alert alert-${type} small mb-0`;
+            msgDiv.textContent = message;
+            msgDiv.style.display = 'block';
+        }
+
+        // Payment method toggle
+        const paymentOptions = document.querySelectorAll('.payment-option');
+        const cardDetails = document.getElementById('cardDetails');
+        const ewalletDetails = document.getElementById('ewalletDetails');
+
+        paymentOptions.forEach(option => {
+            option.addEventListener('click', function() {
+                const method = this.dataset.method;
+
+                document.querySelectorAll('.payment-details').forEach(d => d.style.display = 'none');
+
+                if (method === 'Card') cardDetails.style.display = 'block';
+                if (method === 'EWallet') ewalletDetails.style.display = 'block';
+
+                const submitBtn = document.getElementById('submitBtn');
+                if (method === 'PayAtCounter') {
+                    submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Place Order';
+                } else {
+                    submitBtn.innerHTML = '<i class="bi bi-lock-fill"></i> Complete Payment';
+                }
+            });
+        });
+
+        // Form validation
+        document.getElementById('checkoutForm').addEventListener('submit', function(e) {
+            const method = document.querySelector('input[name="PaymentMethod"]:checked').value;
+
+            if (method === 'Card') {
+                const cardNum = document.getElementById('cardNumber').value.replace(/\s/g, '');
+                if (cardNum.length < 13) {
+                    e.preventDefault();
+                    alert('Please enter a valid card number');
+                    return false;
+                }
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Processing...';
+        });
     </script>
 }
+
+<style>
+    /* Payment Methods */
+    .payment-methods {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .payment-option {
+        position: relative;
+    }
+
+        .payment-option input[type="radio"] {
+            display: none;
+        }
+
+    .payment-label {
+        display: flex;
+        align-items: center;
+        padding: 20px;
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: white;
+    }
+
+        .payment-label:hover {
+            border-color: #0d6efd;
+            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.15);
+        }
+
+    .payment-option input:checked + .payment-label {
+        border-color: #0d6efd;
+        background: #f0f7ff;
+    }
+
+    .payment-icon {
+        font-size: 32px;
+        color: #0d6efd;
+        margin-right: 15px;
+        min-width: 50px;
+        text-align: center;
+    }
+
+    .payment-info {
+        flex: 1;
+    }
+
+    .payment-title {
+        font-weight: 600;
+        font-size: 16px;
+        margin-bottom: 4px;
+    }
+
+    .payment-desc {
+        font-size: 13px;
+        color: #6c757d;
+    }
+
+    .payment-check {
+        font-size: 24px;
+        color: #198754;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .payment-option input:checked + .payment-label .payment-check {
+        opacity: 1;
+    }
+
+    /* Discount Section */
+    .discount-section {
+        background: #fff9e6;
+        padding: 15px;
+        border-radius: 8px;
+        border: 2px dashed #ffc107;
+    }
+
+    .discount-row {
+        font-weight: 600;
+        font-size: 16px;
+    }
+
+    /* E-Wallet Providers */
+    .ewallet-providers {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .ewallet-option input {
+        display: none;
+    }
+
+    .ewallet-card {
+        padding: 15px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+        .ewallet-card i {
+            font-size: 28px;
+            display: block;
+            margin-bottom: 8px;
+            color: #17a2b8;
+        }
+
+    .ewallet-option input:checked + .ewallet-card {
+        border-color: #17a2b8;
+        background: #e7f6f8;
+    }
+
+    /* Order Items */
+    .order-items {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .order-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+        .order-item:last-child {
+            border-bottom: none;
+        }
+
+    .item-qty {
+        background: #f8f9fa;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .item-details {
+        flex: 1;
+    }
+
+    .item-name {
+        font-weight: 500;
+        margin-bottom: 2px;
+    }
+
+    .item-price {
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    /* Price Rows */
+    .price-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        font-size: 15px;
+    }
+
+        .price-row.total {
+            font-size: 18px;
+        }
+</style>

@@ -12,5 +12,8 @@ namespace FoodOrderingMenu.Data
         public DbSet<MenuItem> MenuItems { get; set; } = null!;
         public DbSet<Order> Orders { get; set; } = null!;
         public DbSet<OrderItem> OrderItems { get; set; } = null!;
+        public DbSet<DiscountCode> DiscountCodes { get; set; } = null!;
+        public DbSet<PaymentTransaction> PaymentTransactions { get; set; } = null!;
+
     }
 }
