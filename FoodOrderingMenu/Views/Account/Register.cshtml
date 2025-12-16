@@ -1,30 +1,80 @@
-﻿@{
+@model FoodOrderingMenu.Models.User
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+
+@{
     Layout = "_Layout";
     ViewData["Title"] = "Register";
+    var siteKey = Configuration["ReCaptcha:SiteKey"];
 }
-<h2>Create Account</h2>
 
-@if (ViewBag.Error != null)
-{
-    <div class="alert alert-danger">@ViewBag.Error</div>
+<div class="container col-md-5 mt-4">
+    <h2 class="fw-bold mb-3">Create Account</h2>
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            <i class="bi bi-exclamation-triangle"></i> @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (ViewBag.Error != null)
+    {
+        <div class="alert alert-danger">@ViewBag.Error</div>
+    }
+
+    <form method="post" asp-action="Register" id="registerForm">
+        @Html.AntiForgeryToken()
+
+        <div class="mb-3">
+            <label class="form-label">Full Name</label>
+            <input asp-for="FullName" type="text" id="fullNameInput" class="form-control" placeholder="Enter your full name" />
+            <small id="fullNameError" class="text-danger d-none">Please enter your full name.</small>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input asp-for="Email" type="email" id="emailInput" class="form-control" placeholder="Enter your email" />
+            <small id="emailError" class="text-danger d-none">Please enter a valid email.</small>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Password</label>
+            <div class="input-group">
+                <input type="password" name="password" id="passwordInput" class="form-control" placeholder="Minimum 6 characters" />
+                <button type="button" class="btn btn-outline-secondary" id="togglePassword">
+                    <span id="eyeIcon">Show</span>
+                </button>
+            </div>
+            <small class="text-muted">At least 6 characters</small>
+            <small id="passwordError" class="text-danger d-none d-block">Please enter a password (minimum 6 characters).</small>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Confirm Password</label>
+            <div class="input-group">
+                <input type="password" name="confirmPassword" id="confirmPasswordInput" class="form-control" placeholder="Re-enter password" />
+                <button type="button" class="btn btn-outline-secondary" id="toggleConfirmPassword">
+                    <span id="eyeIcon2">Show</span>
+                </button>
+            </div>
+            <small id="confirmPasswordError" class="text-danger d-none d-block">Passwords do not match.</small>
+        </div>
+
+        <div class="mb-3">
+            <div class="g-recaptcha" data-sitekey="@siteKey"></div>
+            <span id="captchaError" class="text-danger"></span>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100" id="registerBtn">Register</button>
+    </form>
+
+    <div class="text-center mt-3">
+        <p>Already have an account? <a asp-action="Login" class="text-primary">Login here</a></p>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://www.google.com/recaptcha/api.js"></script>
+    <script src="~/js/register.js"></script>
 }
-<form method="post" asp-action="Register">
-
-    <div class="mb-3">
-        <label class="form-label">Full Name</label>
-        <input type="text" name="fullName" class="form-control" />
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Email</label>
-        <input type="email" name="email" class="form-control" />
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Password</label>
-        <input type="password" name="password" class="form-control" />
-    </div>
-
-    <button class="btn btn-primary">Register</button>
-</form>
-

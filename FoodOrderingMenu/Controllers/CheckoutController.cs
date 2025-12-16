@@ -3,207 +3,241 @@ using FoodOrderingMenu.Helpers;
 using FoodOrderingMenu.Models;
 using FoodOrderingMenu.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
+using System.Text.Json;
 
 namespace FoodOrderingMenu.Controllers
 {
     public class CheckoutController : Controller
     {
-        private const string CART_KEY = "CART";
-        private const string DISCOUNT_KEY = "DISCOUNT";
         private readonly AppDbContext _db;
         private readonly IPaymentService _paymentService;
         private readonly IDiscountService _discountService;
 
-        public CheckoutController(
-            AppDbContext db,
-            IPaymentService paymentService,
-            IDiscountService discountService)
+        public CheckoutController(AppDbContext db, IPaymentService paymentService, IDiscountService discountService)
         {
             _db = db;
             _paymentService = paymentService;
             _discountService = discountService;
         }
 
-        private List<CartItem> GetCart()
-            => HttpContext.Session.GetObject<List<CartItem>>(CART_KEY) ?? new List<CartItem>();
-
-        private void ClearCart()
-        {
-            HttpContext.Session.Remove(CART_KEY);
-            HttpContext.Session.Remove(DISCOUNT_KEY);
-        }
-
-        [HttpGet]
         public IActionResult Index()
         {
-            var cart = GetCart();
-            if (!cart.Any()) return RedirectToAction("Index", "Cart");
+            // Get cart items from session
+            var cart = HttpContext.Session.GetObject<List<CartItem>>("CART") ?? new List<CartItem>();
 
-            var vm = BuildTotals(cart);
-
-            // Restore discount from session if exists
-            var discountData = HttpContext.Session.GetObject<(string code, decimal amount)>(DISCOUNT_KEY);
-            if (discountData != default)
-            {
-                vm.DiscountCodeInput = discountData.code;
-                vm.DiscountAmount = discountData.amount;
-                vm.IsDiscountApplied = true;
-                vm.DiscountMessage = $"Discount applied! You're saving RM {discountData.amount:F2}";
-            }
-
-            return View(vm);
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ApplyDiscount(string discountCode)
-        {
-            var cart = GetCart();
             if (!cart.Any())
             {
-                return Json(new { success = false, message = "Your cart is empty" });
-            }
-
-            var totals = BuildTotals(cart);
-            var (isValid, message, discountAmount, code) =
-                await _discountService.ValidateAndCalculateDiscount(discountCode, totals.GrandTotal);
-
-            if (isValid)
-            {
-                // Store discount in session
-                HttpContext.Session.SetObject(DISCOUNT_KEY, (discountCode, discountAmount));
-
-                return Json(new
-                {
-                    success = true,
-                    message = message,
-                    discountAmount = discountAmount,
-                    finalTotal = totals.GrandTotal - discountAmount
-                });
-            }
-
-            return Json(new { success = false, message = message });
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult RemoveDiscount()
-        {
-            HttpContext.Session.Remove(DISCOUNT_KEY);
-            return Json(new { success = true });
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Pay(CheckoutViewModel vm)
-        {
-            var cart = GetCart();
-            if (!cart.Any())
-            {
-                TempData["Error"] = "Your cart is empty.";
+                TempData["Error"] = "Your cart is empty!";
                 return RedirectToAction("Index", "Cart");
             }
 
-            // Validate payment method
-            if (string.IsNullOrWhiteSpace(vm.PaymentMethod))
+            // Calculate totals
+            decimal subtotal = cart.Sum(c => c.LineTotal);
+            decimal serviceTax = subtotal * 0.10m; // 10%
+            decimal sst = subtotal * 0.06m;        // 6%
+            decimal grandTotal = subtotal + serviceTax + sst;
+
+            // Get discount from session (if any)
+            bool isDiscountApplied = false;
+            decimal discountAmount = 0;
+            string discountMessage = "";
+            int? discountCodeId = null;
+
+            try
             {
-                TempData["Error"] = "Please select a payment method.";
-                return RedirectToAction("Index");
+                var discountJson = HttpContext.Session.GetString("DISCOUNT");
+
+                if (!string.IsNullOrEmpty(discountJson))
+                {
+                    var discountData = JsonSerializer.Deserialize<DiscountSessionData>(discountJson);
+
+                    if (discountData != null)
+                    {
+                        isDiscountApplied = true;
+                        discountAmount = discountData.DiscountAmount;
+                        discountMessage = discountData.Message;
+                        discountCodeId = discountData.DiscountCodeId;
+                    }
+                }
+            }
+            catch
+            {
+                // If there's any error reading discount, just ignore it
+                isDiscountApplied = false;
             }
 
-            // Validate card payment
-            if (vm.PaymentMethod == "Card")
+            var model = new CheckoutViewModel
             {
-                if (!_paymentService.ValidateCardNumber(vm.CardNumber ?? ""))
+                Items = cart,
+                Subtotal = subtotal,
+                ServiceTax = serviceTax,
+                SST = sst,
+                GrandTotal = grandTotal, // Grand Total WITHOUT discount
+                DiscountAmount = discountAmount,
+                IsDiscountApplied = isDiscountApplied,
+                DiscountMessage = discountMessage,
+                PaymentMethod = "PayAtCounter" // Default
+            };
+
+            return View(model);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ApplyDiscount(string discountCode)
+        {
+            // Get cart
+            var cart = HttpContext.Session.GetObject<List<CartItem>>("CART") ?? new List<CartItem>();
+
+            if (!cart.Any())
+            {
+                TempData["Error"] = "Your cart is empty!";
+                return RedirectToAction("Index", "Cart");
+            }
+
+            // Calculate subtotal
+            decimal subtotal = cart.Sum(c => c.LineTotal);
+            decimal serviceTax = subtotal * 0.10m;
+            decimal sst = subtotal * 0.06m;
+            decimal grandTotal = subtotal + serviceTax + sst;
+
+            // Validate discount code
+            var (isValid, message, discountAmount, code) = await _discountService.ValidateAndCalculateDiscount(discountCode, grandTotal);
+
+            if (isValid && code != null)
+            {
+                // Store discount in session
+                var discountData = new DiscountSessionData
+                {
+                    DiscountCodeId = code.Id,
+                    DiscountCode = code.Code,
+                    DiscountAmount = discountAmount,
+                    Message = message
+                };
+
+                var json = JsonSerializer.Serialize(discountData);
+                HttpContext.Session.SetString("DISCOUNT", json);
+
+                TempData["Success"] = message;
+            }
+            else
+            {
+                TempData["Error"] = message;
+            }
+
+            return RedirectToAction("Index");
+        }
+
+        [HttpPost]
+        public IActionResult RemoveDiscount()
+        {
+            // Remove discount from session
+            HttpContext.Session.Remove("DISCOUNT");
+            TempData["Success"] = "Discount code removed.";
+            return RedirectToAction("Index");
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Pay(CheckoutViewModel model)
+        {
+            // Get cart
+            var cart = HttpContext.Session.GetObject<List<CartItem>>("CART") ?? new List<CartItem>();
+
+            if (!cart.Any())
+            {
+                TempData["Error"] = "Your cart is empty!";
+                return RedirectToAction("Index", "Cart");
+            }
+
+            // Calculate totals
+            decimal subtotal = cart.Sum(c => c.LineTotal);
+            decimal serviceTax = subtotal * 0.10m;
+            decimal sst = subtotal * 0.06m;
+            decimal grandTotal = subtotal + serviceTax + sst;
+
+            // Get discount from session
+            int? discountCodeId = null;
+            decimal discountAmount = 0;
+            decimal finalTotal = grandTotal; // Start with grand total
+
+            try
+            {
+                var discountJson = HttpContext.Session.GetString("DISCOUNT");
+
+                if (!string.IsNullOrEmpty(discountJson))
+                {
+                    var discountData = JsonSerializer.Deserialize<DiscountSessionData>(discountJson);
+
+                    if (discountData != null)
+                    {
+                        discountCodeId = discountData.DiscountCodeId;
+                        discountAmount = discountData.DiscountAmount;
+
+                        // Calculate final total with discount
+                        finalTotal = grandTotal - discountAmount;
+                    }
+                }
+            }
+            catch
+            {
+                // If error, continue without discount
+            }
+
+            // Get user ID (if logged in)
+            int? userId = null;
+            if (User.Identity?.IsAuthenticated == true)
+            {
+                var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+                if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int parsedUserId))
+                {
+                    userId = parsedUserId;
+                }
+            }
+
+            // Validate payment method specific fields
+            if (model.PaymentMethod == "Card")
+            {
+                if (!_paymentService.ValidateCardNumber(model.CardNumber ?? ""))
                 {
                     TempData["Error"] = "Invalid card number. Please check and try again.";
                     return RedirectToAction("Index");
                 }
 
-                if (string.IsNullOrWhiteSpace(vm.CardHolderName))
-                {
-                    TempData["Error"] = "Card holder name is required.";
-                    return RedirectToAction("Index");
-                }
-
-                if (!_paymentService.ValidateExpiryDate(vm.ExpiryMonth ?? "", vm.ExpiryYear ?? ""))
-                {
-                    TempData["Error"] = "Card has expired or invalid expiry date.";
-                    return RedirectToAction("Index");
-                }
-
-                if (!_paymentService.ValidateCVV(vm.CVV ?? ""))
+                if (!_paymentService.ValidateCVV(model.CVV ?? ""))
                 {
                     TempData["Error"] = "Invalid CVV code.";
                     return RedirectToAction("Index");
                 }
-            }
 
-            // Validate E-Wallet
-            if (vm.PaymentMethod == "EWallet")
-            {
-                if (string.IsNullOrWhiteSpace(vm.EWalletProvider))
+                if (!_paymentService.ValidateExpiryDate(model.ExpiryMonth ?? "", model.ExpiryYear ?? ""))
                 {
-                    TempData["Error"] = "Please choose an E-Wallet provider.";
-                    return RedirectToAction("Index");
-                }
-
-                if (string.IsNullOrWhiteSpace(vm.EWalletPhone))
-                {
-                    TempData["Error"] = "Phone number is required for E-Wallet payment.";
+                    TempData["Error"] = "Card has expired or invalid expiry date.";
                     return RedirectToAction("Index");
                 }
             }
-
-            var totals = BuildTotals(cart);
-
-            // Get discount from session
-            var discountData = HttpContext.Session.GetObject<(string code, decimal amount)>(DISCOUNT_KEY);
-            DiscountCode? discountCode = null;
-            decimal discountAmount = 0;
-
-            if (discountData != default)
+            else if (model.PaymentMethod == "EWallet")
             {
-                var (isValid, _, amount, code) =
-                    await _discountService.ValidateAndCalculateDiscount(discountData.code, totals.GrandTotal);
-
-                if (isValid)
+                if (string.IsNullOrWhiteSpace(model.EWalletProvider))
                 {
-                    discountCode = code;
-                    discountAmount = amount;
+                    TempData["Error"] = "Please select an E-Wallet provider.";
+                    return RedirectToAction("Index");
                 }
             }
-
-            int? userId = null;
-            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (int.TryParse(userIdStr, out var parsed)) userId = parsed;
-
-            // Calculate final total
-            decimal finalTotal = totals.GrandTotal - discountAmount;
 
             // Create order
-            var order = new Models.Order
+            var order = new Order
             {
                 UserId = userId,
                 Status = "Received",
-                PaymentMethod = vm.PaymentMethod,
-                PaymentProvider = vm.PaymentMethod == "EWallet" ? vm.EWalletProvider :
-                                  vm.PaymentMethod == "Card" ? _paymentService.GetCardType(vm.CardNumber ?? "") :
-                                  "Cash",
-                Subtotal = totals.Subtotal,
-                ServiceTax = totals.ServiceTax,
-                SST = totals.SST,
-                GrandTotal = totals.GrandTotal,
-                DiscountCodeId = discountCode?.Id,
+                PaymentMethod = model.PaymentMethod,
+                PaymentProvider = model.PaymentMethod == "EWallet" ? model.EWalletProvider : null,
+                Subtotal = subtotal,
+                ServiceTax = serviceTax,
+                SST = sst,
+                GrandTotal = finalTotal, // Store the final amount after discount
+                DiscountCodeId = discountCodeId,
                 DiscountAmount = discountAmount,
                 CreatedAt = DateTime.UtcNow,
-            };
-
-            foreach (var c in cart)
-            {
-                order.Items.Add(new OrderItem
+                Items = cart.Select(c => new OrderItem
                 {
                     MenuItemId = c.MenuItemId,
                     Name = c.Name,
@@ -211,57 +245,54 @@ namespace FoodOrderingMenu.Controllers
                     Qty = c.Qty,
                     Sweetness = c.Sweetness,
                     IceLevel = c.IceLevel
-                });
-            }
+                }).ToList()
+            };
 
             _db.Orders.Add(order);
             await _db.SaveChangesAsync();
 
-            // Process payment with final total
-            vm.GrandTotal = finalTotal;
-            var paymentResult = await _paymentService.ProcessPayment(vm, order.Id);
+            // Update checkout model with totals for payment processing
+            model.Subtotal = subtotal;
+            model.ServiceTax = serviceTax;
+            model.SST = sst;
+            model.GrandTotal = finalTotal; // Pass the final total after discount
+            model.DiscountAmount = discountAmount;
 
-            if (paymentResult.Status == "Failed")
+            // Process payment
+            var paymentResult = await _paymentService.ProcessPayment(model, order.Id);
+
+            if (paymentResult.Status != "Success")
             {
-                TempData["Error"] = $"Payment failed: {paymentResult.ErrorMessage}";
-
-                _db.Orders.Remove(order);
+                // Payment failed - update order status
+                order.Status = "Cancelled";
+                order.CancellationReason = paymentResult.ErrorMessage ?? "Payment failed";
                 await _db.SaveChangesAsync();
 
+                TempData["Error"] = $"Payment failed: {paymentResult.ErrorMessage}";
                 return RedirectToAction("Index");
             }
 
-            // Increment discount usage count
-            if (discountCode != null)
+            // Increment discount code usage
+            if (discountCodeId.HasValue)
             {
-                await _discountService.IncrementUsageCount(discountCode.Id);
+                await _discountService.IncrementUsageCount(discountCodeId.Value);
             }
 
-            // Clear cart and discount
-            ClearCart();
+            // Clear cart and discount from session
+            HttpContext.Session.Remove("CART");
+            HttpContext.Session.Remove("DISCOUNT");
 
-            TempData["TransactionId"] = paymentResult.TransactionId;
-            TempData["PaymentStatus"] = paymentResult.Status;
-            TempData["DiscountSaved"] = discountAmount > 0 ? discountAmount : (decimal?)null;
-
+            TempData["Success"] = "Order placed successfully!";
             return RedirectToAction("Success", "Orders", new { id = order.Id });
         }
+    }
 
-        private CheckoutViewModel BuildTotals(List<CartItem> cart)
-        {
-            var subtotal = cart.Sum(x => x.LineTotal);
-            var serviceTax = Math.Round(subtotal * 0.10m, 2);
-            var sst = Math.Round(subtotal * 0.06m, 2);
-            var grand = subtotal + serviceTax + sst;
-
-            return new CheckoutViewModel
-            {
-                Items = cart,
-                Subtotal = Math.Round(subtotal, 2),
-                ServiceTax = serviceTax,
-                SST = sst,
-                GrandTotal = Math.Round(grand, 2)
-            };
-        }
+    // Helper class for storing discount in session
+    public class DiscountSessionData
+    {
+        public int DiscountCodeId { get; set; }
+        public string DiscountCode { get; set; } = "";
+        public decimal DiscountAmount { get; set; }
+        public string Message { get; set; } = "";
     }
 }

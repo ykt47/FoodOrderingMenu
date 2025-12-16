@@ -1,4 +1,5 @@
-using FoodOrderingMenu.Data;
+﻿using FoodOrderingMenu.Data;
+using FoodOrderingMenu.Services; // ADD THIS
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,6 +27,12 @@ builder.Services.AddSession(options =>
     options.IdleTimeout = TimeSpan.FromHours(2);
     options.Cookie.HttpOnly = true;
 });
+
+// ✨ ADD THESE SERVICE REGISTRATIONS ✨
+builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<IDiscountService, DiscountService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddHttpClient<ICaptchaService, CaptchaService>();
 
 var app = builder.Build();
 

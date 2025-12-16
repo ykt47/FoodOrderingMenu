@@ -12,6 +12,15 @@
 
         <h2 class="fw-bold mt-4 mb-2">Order Placed Successfully! 🎉</h2>
         <p class="text-muted mb-4">Your order has been received and is being processed.</p>
+
+        @* Show savings message if discount was applied *@
+        @if (Model.DiscountAmount > 0)
+        {
+            <div class="alert alert-success d-inline-block">
+                <i class="bi bi-piggy-bank"></i>
+                <strong>You saved RM @Model.DiscountAmount.ToString("F2")!</strong>
+            </div>
+        }
     </div>
 
     <!-- Order Details Card -->
@@ -48,7 +57,6 @@
                                 @if (!string.IsNullOrWhiteSpace(Model.PaymentProvider))
                                 {
                                     <br />
-                                
                                     <small class="text-muted">via @Model.PaymentProvider</small>
                                 }
                             </div>
@@ -103,8 +111,24 @@
                     <span class="text-muted">SST (6%)</span>
                     <span>RM @Model.SST.ToString("F2")</span>
                 </div>
-                <div class="d-flex justify-content-between">
-                    <strong class="fs-5">Grand Total</strong>
+
+                @* Display discount if applied *@
+                @if (Model.DiscountAmount > 0)
+                {
+                    <div class="d-flex justify-content-between mb-3 text-success">
+                        <span>
+                            <i class="bi bi-tag-fill"></i> Discount
+                            @if (Model.DiscountCode != null)
+                            {
+                                <small class="text-muted">(@Model.DiscountCode.Code)</small>
+                            }
+                        </span>
+                        <span class="fw-semibold">- RM @Model.DiscountAmount.ToString("F2")</span>
+                    </div>
+                }
+
+                <div class="d-flex justify-content-between border-top pt-3">
+                    <strong class="fs-5">@(Model.DiscountAmount > 0 ? "Final Total" : "Grand Total")</strong>
                     <strong class="fs-5 text-success">RM @Model.GrandTotal.ToString("F2")</strong>
                 </div>
             </div>
@@ -145,4 +169,4 @@
             }
         </ul>
     </div>
-</div>  
+</div>

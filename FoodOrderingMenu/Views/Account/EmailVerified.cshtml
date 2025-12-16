@@ -1,0 +1,34 @@
+@{
+    ViewData["Title"] = "Email Verified";
+}
+
+<div class="container">
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-6">
+            <div class="card shadow-sm text-center">
+                <div class="card-body py-5">
+                    <div class="mb-4">
+                        <i class="bi bi-check-circle-fill" style="font-size: 80px; color: #4CAF50;"></i>
+                    </div>
+                    
+                    <h2 class="card-title text-success mb-3">Email Verified Successfully!</h2>
+                    
+                    <p class="lead">
+                        Your account has been verified. You can now login and start ordering!
+                    </p>
+                    
+                    <div class="alert alert-success">
+                        <i class="bi bi-gift"></i>
+                        <strong>Welcome Bonus:</strong> Use code <strong>WELCOME10</strong> for 10% off your first order!
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-4">
+                        <a asp-action="Login" class="btn btn-success btn-lg">
+                            <i class="bi bi-box-arrow-in-right"></i> Login Now
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

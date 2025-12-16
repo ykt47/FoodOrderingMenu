@@ -163,13 +163,32 @@
         const dailySalesData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.DailySales));
         const paymentData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.PaymentBreakdown));
 
-        // Daily Sales Chart
+        console.log("Daily Sales Data:", dailySalesData);
+        console.log("Payment Data:", paymentData);
+
+        // Daily Sales Chart - FIXED DATE HANDLING
         const dailyLabels = dailySalesData.map(d => {
-            const date = new Date(d.date);
-            return date.toLocaleDateString('en-MY', { month: 'short', day: 'numeric' });
+            // The date property might be "date" or "Date" depending on serialization
+            const dateValue = d.date || d.Date;
+
+            // Handle ISO date string (e.g., "2025-12-16T00:00:00")
+            const date = new Date(dateValue);
+
+            // Check if date is valid
+            if (isNaN(date.getTime())) {
+                console.error("Invalid date:", dateValue);
+                return "Invalid";
+            }
+
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         });
-        const dailyRevenue = dailySalesData.map(d => d.revenue);
-        const dailyOrders = dailySalesData.map(d => d.orderCount);
+
+        const dailyRevenue = dailySalesData.map(d => d.revenue || d.Revenue || 0);
+        const dailyOrders = dailySalesData.map(d => d.orderCount || d.OrderCount || 0);
+
+        console.log("Labels:", dailyLabels);
+        console.log("Revenue:", dailyRevenue);
+        console.log("Orders:", dailyOrders);
 
         const ctxDaily = document.getElementById('dailySalesChart').getContext('2d');
         new Chart(ctxDaily, {
@@ -212,7 +231,8 @@
                         title: {
                             display: true,
                             text: 'Revenue (RM)'
-                        }
+                        },
+                        beginAtZero: true
                     },
                     y1: {
                         type: 'linear',
@@ -224,7 +244,8 @@
                         },
                         grid: {
                             drawOnChartArea: false
-                        }
+                        },
+                        beginAtZero: true
                     }
                 },
                 plugins: {
@@ -236,9 +257,9 @@
             }
         });
 
-        // Payment Methods Chart
-        const paymentLabels = paymentData.map(p => p.method);
-        const paymentCounts = paymentData.map(p => p.count);
+        // Payment Methods Chart - FIXED PROPERTY HANDLING
+        const paymentLabels = paymentData.map(p => p.method || p.Method || 'Unknown');
+        const paymentCounts = paymentData.map(p => p.count || p.Count || 0);
         const paymentColors = [
             '#0d6efd', '#198754', '#ffc107', '#dc3545', '#6c757d'
         ];
@@ -268,7 +289,7 @@
                                 const label = context.label || '';
                                 const value = context.parsed;
                                 const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = ((value / total) * 100).toFixed(1);
+                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
                                 return `${label}: ${value} orders (${percentage}%)`;
                             }
                         }

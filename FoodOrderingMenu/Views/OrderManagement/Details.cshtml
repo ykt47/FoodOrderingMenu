@@ -139,12 +139,42 @@
                         </div>
                     </div>
 
+                    @* Display discount if applied *@
+                    @if (Model.DiscountAmount > 0)
+                    {
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between text-success">
+                                <span>
+                                    <i class="bi bi-tag-fill"></i> Discount:
+                                </span>
+                                <span>- RM @Model.DiscountAmount.ToString("F2")</span>
+                            </div>
+                            @if (Model.DiscountCode != null)
+                            {
+                                <small class="text-muted d-block mt-1">
+                                    Code: <strong>@Model.DiscountCode.Code</strong>
+                                </small>
+                            }
+                        </div>
+                    }
+
                     <hr />
 
                     <div class="d-flex justify-content-between">
-                        <strong>Grand Total:</strong>
+                        <strong>@(Model.DiscountAmount > 0 ? "Final Total:" : "Grand Total:")</strong>
                         <strong class="text-success fs-5">RM @Model.GrandTotal.ToString("F2")</strong>
                     </div>
+
+                    @* Show savings message if discount applied *@
+                    @if (Model.DiscountAmount > 0)
+                    {
+                        <div class="alert alert-success mt-3 mb-0 py-2">
+                            <small>
+                                <i class="bi bi-piggy-bank"></i>
+                                You saved RM @Model.DiscountAmount.ToString("F2")!
+                            </small>
+                        </div>
+                    }
                 </div>
             </div>
         </div>

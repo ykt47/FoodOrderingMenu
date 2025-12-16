@@ -1,252 +1,359 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using FoodOrderingMenu.Data;
+﻿using FoodOrderingMenu.Data;
 using FoodOrderingMenu.Models;
-using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
+using FoodOrderingMenu.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace FoodOrderingMenu.Controllers
 {
     public class AccountController : Controller
     {
         private readonly AppDbContext _db;
-        public AccountController(AppDbContext db) => _db = db;
+        private readonly ICaptchaService _captchaService;
+        private readonly IEmailService _emailService;
+        private readonly IConfiguration _configuration;
 
-        // -----------------------------
-        // REGISTER
-        // -----------------------------
+        public AccountController(AppDbContext db, ICaptchaService captchaService, IEmailService emailService, IConfiguration configuration)
+        {
+            _db = db;
+            _captchaService = captchaService;
+            _emailService = emailService;
+            _configuration = configuration;
+        }
+        // Add this to your AccountController temporarily for testing
+
         [HttpGet]
-        public IActionResult Register() => View();
+        public IActionResult CaptchaTest()
+        {
+            return View();
+        }
 
         [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Register(string fullName, string email, string password, string? confirmPassword)
+        public async Task<IActionResult> CaptchaTest(string test)
         {
-            fullName = fullName?.Trim() ?? "";
-            email = (email ?? "").Trim().ToLowerInvariant();
-            password = password ?? "";
-            confirmPassword = confirmPassword ?? "";
+            var gRecaptchaResponse = Request.Form["g-recaptcha-response"].ToString();
 
-            if (string.IsNullOrWhiteSpace(fullName) ||
-                string.IsNullOrWhiteSpace(email) ||
-                string.IsNullOrWhiteSpace(password))
+            ViewBag.ReceivedResponse = gRecaptchaResponse;
+            ViewBag.ResponseLength = gRecaptchaResponse?.Length ?? 0;
+
+            if (string.IsNullOrEmpty(gRecaptchaResponse))
             {
-                ViewBag.Error = "Full name, email and password are required.";
+                ViewBag.Result = "ERROR: No CAPTCHA response received";
                 return View();
             }
 
-            // If your Register page has confirm password, enforce it
-            if (!string.IsNullOrWhiteSpace(confirmPassword) && password != confirmPassword)
+            // Test the CAPTCHA service
+            var isValid = await _captchaService.VerifyCaptcha(gRecaptchaResponse);
+
+            ViewBag.Result = isValid ? "SUCCESS!" : "FAILED";
+
+            // Also test directly with HttpClient
+            var secretKey = _configuration["ReCaptcha:SecretKey"];
+            using var client = new HttpClient();
+            var url = $"https://www.google.com/recaptcha/api/siteverify?secret={secretKey}&response={gRecaptchaResponse}";
+            var response = await client.PostAsync(url, null);
+            var jsonResponse = await response.Content.ReadAsStringAsync();
+
+            ViewBag.GoogleResponse = jsonResponse;
+            ViewBag.SecretKey = secretKey?.Substring(0, 10) + "..."; // Show first 10 chars only
+
+            return View();
+        }
+        // GET: Register
+        public IActionResult Register()
+        {
+            return View();
+        }
+
+        // POST: Register
+        [HttpPost]
+        public async Task<IActionResult> Register(User user, string password, string confirmPassword)
+        {
+            // Get CAPTCHA from form data - THIS IS THE FIX!
+            var gRecaptchaResponse = Request.Form["g-recaptcha-response"].ToString();
+
+            // Verify CAPTCHA
+            if (string.IsNullOrEmpty(gRecaptchaResponse))
             {
-                ViewBag.Error = "Passwords do not match.";
-                return View();
+                TempData["Error"] = "Please complete the CAPTCHA verification";
+                return View(user);
             }
 
-            if (await _db.Users.AnyAsync(u => u.Email == email))
+            bool isCaptchaValid = await _captchaService.VerifyCaptcha(gRecaptchaResponse);
+            if (!isCaptchaValid)
             {
-                ViewBag.Error = "Email already registered.";
-                return View();
+                TempData["Error"] = "CAPTCHA verification failed. Please try again.";
+                return View(user);
             }
 
-            var user = new User
+            // Validate passwords match
+            if (password != confirmPassword)
             {
-                FullName = fullName,
-                Email = email,
-                PasswordHash = Utilities.HashPassword(password),
-                EmailConfirmed = true,
-                Role = "Customer",
-                CreatedAt = DateTime.UtcNow
-            };
+                TempData["Error"] = "Passwords do not match";
+                return View(user);
+            }
+
+            // Check if email already exists
+            if (await _db.Users.AnyAsync(u => u.Email == user.Email))
+            {
+                TempData["Error"] = "Email already registered";
+                return View(user);
+            }
+
+            // Create user
+            user.PasswordHash = Utilities.HashPassword(password);
+            user.EmailConfirmed = false; // Not confirmed yet
+            user.Role = "Customer";
+            user.CreatedAt = DateTime.UtcNow;
 
             _db.Users.Add(user);
             await _db.SaveChangesAsync();
 
-            TempData["Success"] = "Registration successful. Please sign in.";
-            return RedirectToAction("Login");
+            // Generate verification token
+            var token = GenerateVerificationToken(user.Id);
+            var baseUrl = _configuration["AppSettings:BaseUrl"] ?? Request.Scheme + "://" + Request.Host;
+            var verificationLink = $"{baseUrl}/Account/VerifyEmail?userId={user.Id}&token={token}";
+
+            // Send verification email
+            bool emailSent = await _emailService.SendVerificationEmail(user.Email, user.FullName, verificationLink);
+
+            if (!emailSent)
+            {
+                TempData["Error"] = "Account created but failed to send verification email. Please contact support.";
+                return RedirectToAction("Login");
+            }
+
+            // Show email sent page
+            return View("EmailSent");
         }
 
-        // -----------------------------
-        // LOGIN
-        // -----------------------------
-        [HttpGet]
-        public IActionResult Login() => View();
+        // GET: Verify Email
+        public async Task<IActionResult> VerifyEmail(int userId, string token)
+        {
+            var user = await _db.Users.FindAsync(userId);
 
+            if (user == null)
+            {
+                TempData["Error"] = "Invalid verification link";
+                return RedirectToAction("Login");
+            }
+
+            if (user.EmailConfirmed)
+            {
+                TempData["Success"] = "Email already verified. Please login.";
+                return RedirectToAction("Login");
+            }
+
+            // Verify token
+            var expectedToken = GenerateVerificationToken(userId);
+            if (token != expectedToken)
+            {
+                TempData["Error"] = "Invalid or expired verification link";
+                return RedirectToAction("Login");
+            }
+
+            // Mark email as confirmed
+            user.EmailConfirmed = true;
+            await _db.SaveChangesAsync();
+
+            // Show success page
+            return View("EmailVerified");
+        }
+
+        // GET: Login
+        public IActionResult Login()
+        {
+            return View();
+        }
+
+        // POST: Login
         [HttpPost]
-        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(string email, string password)
         {
-            email = (email ?? "").Trim().ToLowerInvariant();
-            password = password ?? "";
+            // Get CAPTCHA from form data - THIS IS THE FIX!
+            var gRecaptchaResponse = Request.Form["g-recaptcha-response"].ToString();
 
-            // Validation
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+            // Verify CAPTCHA
+            if (string.IsNullOrEmpty(gRecaptchaResponse))
             {
-                ViewBag.Error = "Provide email and password.";
+                TempData["Error"] = "Please complete the CAPTCHA verification";
                 return View();
             }
 
-            // Lockout
-            int failedAttempts = HttpContext.Session.GetInt32("FailedAttempts") ?? 0;
-
-            DateTime? lockoutEnd = null;
-            var lockoutRaw = HttpContext.Session.GetString("LockoutEnd");
-            if (!string.IsNullOrWhiteSpace(lockoutRaw) && DateTime.TryParse(lockoutRaw, out var parsed))
-                lockoutEnd = parsed;
-
-            if (lockoutEnd.HasValue && lockoutEnd.Value > DateTime.Now)
+            bool isCaptchaValid = await _captchaService.VerifyCaptcha(gRecaptchaResponse);
+            if (!isCaptchaValid)
             {
-                double secondsLeft = Math.Ceiling((lockoutEnd.Value - DateTime.Now).TotalSeconds);
-                ViewBag.Error = $"Too many failed attempts. Try again in {secondsLeft} seconds.";
+                TempData["Error"] = "CAPTCHA verification failed. Please try again.";
                 return View();
             }
 
-            // User lookup
+            // Find user
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
-            bool isValid = user != null && user.PasswordHash == Utilities.HashPassword(password);
 
-            if (!isValid)
+            if (user == null)
             {
-                failedAttempts++;
-                HttpContext.Session.SetInt32("FailedAttempts", failedAttempts);
-
-                if (failedAttempts >= 5)
-                {
-                    var end = DateTime.Now.AddSeconds(60);
-                    HttpContext.Session.SetString("LockoutEnd", end.ToString("O"));
-                    ViewBag.Error = "Too many failed attempts. Account locked for 60 seconds.";
-                }
-                else
-                {
-                    int left = 5 - failedAttempts;
-                    ViewBag.Error = $"Invalid credentials. Attempts remaining: {left}";
-                }
-
+                TempData["Error"] = "Invalid email or password";
                 return View();
             }
 
-            // Success login (reset lockout)
-            HttpContext.Session.Remove("FailedAttempts");
-            HttpContext.Session.Remove("LockoutEnd");
-            HttpContext.Session.Remove("IsGuest");
+            // Check email is verified
+            if (!user.EmailConfirmed)
+            {
+                TempData["Error"] = "Please verify your email address before logging in. Check your inbox for the verification link.";
+                return View();
+            }
 
-            var displayName = string.IsNullOrWhiteSpace(user!.FullName) ? user.Email : user.FullName;
+            // Verify password
+            var hashedPassword = Utilities.HashPassword(password);
+            if (user.PasswordHash != hashedPassword)
+            {
+                TempData["Error"] = "Invalid email or password";
+                return View();
+            }
 
+            // Create claims
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, displayName),
-                new Claim(ClaimTypes.Email, user.Email ?? ""),
-                new Claim(ClaimTypes.Role, string.IsNullOrWhiteSpace(user.Role) ? "Customer" : user.Role)
+                new Claim(ClaimTypes.Name, user.FullName),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Role, user.Role)
             };
 
-            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            var authProperties = new AuthenticationProperties
+            {
+                IsPersistent = true,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)
+            };
 
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
-                new ClaimsPrincipal(identity));
+                new ClaimsPrincipal(claimsIdentity),
+                authProperties);
 
-            TempData["LoginSuccess"] = "Welcome back!";
-
+            // Redirect based on role
             if (user.Role == "Admin")
                 return RedirectToAction("Index", "Admin");
-
-            return RedirectToAction("Index", "Home");
+            else
+                return RedirectToAction("Index", "Home");
         }
 
-        // -----------------------------
-        // CONTINUE AS GUEST (NO LOGIN FORM)
-        // -----------------------------
-        [HttpGet]
-        public IActionResult Guest()
-        {
-            // No cookie auth needed; session is enough for cart browsing
-            HttpContext.Session.SetString("IsGuest", "1");
-            return RedirectToAction("Index", "Home");
-        }
-
-        // -----------------------------
-        // FORGOT PASSWORD
-        // -----------------------------
-        [HttpGet]
-        public IActionResult ForgotPassword() => View();
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ForgotPassword(ForgotPasswordViewModel model)
-        {
-            model.Email = (model.Email ?? "").Trim().ToLowerInvariant();
-            model.FullName = (model.FullName ?? "").Trim();
-
-            if (string.IsNullOrWhiteSpace(model.Email) || string.IsNullOrWhiteSpace(model.FullName))
-            {
-                ViewBag.Error = "Please fill in both fields.";
-                return View(model);
-            }
-
-            var user = await _db.Users.FirstOrDefaultAsync(u =>
-                u.Email == model.Email && u.FullName == model.FullName);
-
-            if (user == null)
-            {
-                ViewBag.Error = "No user found matching the provided name and email.";
-                return View(model);
-            }
-
-            return RedirectToAction("ResetPassword", new { email = user.Email, fullName = user.FullName });
-        }
-
-        // -----------------------------
-        // RESET PASSWORD
-        // -----------------------------
-        [HttpGet]
-        public IActionResult ResetPassword(string email, string fullName)
-        {
-            return View(new ResetPasswordViewModel
-            {
-                Email = (email ?? "").Trim().ToLowerInvariant(),
-                FullName = (fullName ?? "").Trim()
-            });
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ResetPassword(ResetPasswordViewModel model)
-        {
-            model.Email = (model.Email ?? "").Trim().ToLowerInvariant();
-            model.FullName = (model.FullName ?? "").Trim();
-
-            if (string.IsNullOrWhiteSpace(model.NewPassword))
-            {
-                ViewBag.Error = "New password is required.";
-                return View(model);
-            }
-
-            var user = await _db.Users.FirstOrDefaultAsync(u =>
-                u.Email == model.Email && u.FullName == model.FullName);
-
-            if (user == null)
-            {
-                ViewBag.Error = "User not found.";
-                return View(model);
-            }
-
-            user.PasswordHash = Utilities.HashPassword(model.NewPassword);
-            await _db.SaveChangesAsync();
-
-            TempData["Success"] = "Password reset successfully! Please log in.";
-            return RedirectToAction("Login", "Account");
-        }
-
-        // -----------------------------
-        // LOGOUT
-        // -----------------------------
+        // GET: Logout
         public async Task<IActionResult> Logout()
         {
-            HttpContext.Session.Remove("IsGuest");
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            return RedirectToAction("Login", "Account");
+            return RedirectToAction("Index", "Home");
+        }
+
+        // GET: Forgot Password
+        public IActionResult ForgotPassword()
+        {
+            return View();
+        }
+
+        // POST: Forgot Password
+        [HttpPost]
+        public async Task<IActionResult> ForgotPassword(string fullName, string email)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email && u.FullName == fullName);
+
+            if (user == null)
+            {
+                TempData["Error"] = "No account found with this name and email";
+                return View();
+            }
+
+            // Generate reset token
+            var token = GenerateVerificationToken(user.Id);
+            var baseUrl = _configuration["AppSettings:BaseUrl"] ?? Request.Scheme + "://" + Request.Host;
+            var resetLink = $"{baseUrl}/Account/ResetPassword?userId={user.Id}&token={token}";
+
+            // Send reset email
+            await _emailService.SendPasswordResetEmail(user.Email, user.FullName, resetLink);
+
+            TempData["Success"] = "Password reset link has been sent to your email";
+            return RedirectToAction("Login");
+        }
+
+        // GET: Reset Password
+        public async Task<IActionResult> ResetPassword(int userId, string token)
+        {
+            var user = await _db.Users.FindAsync(userId);
+
+            if (user == null)
+            {
+                TempData["Error"] = "Invalid reset link";
+                return RedirectToAction("Login");
+            }
+
+            // Verify token
+            var expectedToken = GenerateVerificationToken(userId);
+            if (token != expectedToken)
+            {
+                TempData["Error"] = "Invalid or expired reset link";
+                return RedirectToAction("Login");
+            }
+
+            var model = new ResetPasswordViewModel
+            {
+                Email = user.Email,
+                FullName = user.FullName
+            };
+
+            ViewBag.UserId = userId;
+            ViewBag.Token = token;
+
+            return View(model);
+        }
+
+        // POST: Reset Password
+        [HttpPost]
+        public async Task<IActionResult> ResetPassword(int userId, string token, string newPassword)
+        {
+            var user = await _db.Users.FindAsync(userId);
+
+            if (user == null)
+            {
+                TempData["Error"] = "Invalid request";
+                return RedirectToAction("Login");
+            }
+
+            // Verify token
+            var expectedToken = GenerateVerificationToken(userId);
+            if (token != expectedToken)
+            {
+                TempData["Error"] = "Invalid or expired reset link";
+                return RedirectToAction("Login");
+            }
+
+            // Update password
+            user.PasswordHash = Utilities.HashPassword(newPassword);
+            await _db.SaveChangesAsync();
+
+            TempData["Success"] = "Password reset successfully. Please login with your new password.";
+            return RedirectToAction("Login");
+        }
+
+        // Guest Checkout
+        public IActionResult GuestCheckout()
+        {
+            HttpContext.Session.SetString("IsGuest", "true");
+            return RedirectToAction("Index", "Menu");
+        }
+
+        // Helper: Generate verification token
+        private string GenerateVerificationToken(int userId)
+        {
+            var data = $"{userId}-{DateTime.UtcNow:yyyyMMdd}";
+            using var sha256 = SHA256.Create();
+            var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(data));
+            return Convert.ToBase64String(hash).Replace("+", "-").Replace("/", "_").Replace("=", "");
         }
     }
 }
